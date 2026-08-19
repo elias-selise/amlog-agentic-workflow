@@ -21,10 +21,13 @@ function detectAgentInstructionFile(workspaceDir) {
 
 /**
  * Write or refresh the amlog-managed fenced section inside the instruction file.
+ * Embeds each agent's full instructions inline so any AI CLI reading this file
+ * automatically has the complete agent definitions — no manual @-references needed.
+ *
  * If the file doesn't exist, create AGENTS.md.
  *
  * @param {string} workspaceDir
- * @param {object[]} installedAgents - [{name, type, stage, description}]
+ * @param {object[]} installedAgents - [{name, type, stage, description, path}]
  */
 async function updateAgentInstructionFile(workspaceDir, installedAgents) {
   let filePath = detectAgentInstructionFile(workspaceDir);
@@ -32,19 +35,17 @@ async function updateAgentInstructionFile(workspaceDir, installedAgents) {
     filePath = path.join(workspaceDir, 'AGENTS.md');
   }
 
-  const section = buildSection(installedAgents);
+  const section = buildSection(workspaceDir, installedAgents);
   let content = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
 
   const START_MARKER = '<!-- amlog:start -->';
   const END_MARKER   = '<!-- amlog:end -->';
 
   if (content.includes(START_MARKER)) {
-    // Replace existing section
     const startIdx = content.indexOf(START_MARKER);
     const endIdx   = content.indexOf(END_MARKER) + END_MARKER.length;
     content = content.slice(0, startIdx) + section + content.slice(endIdx);
   } else {
-    // Append section
     content = content.trimEnd() + '\n\n' + section + '\n';
   }
 
@@ -53,29 +54,76 @@ async function updateAgentInstructionFile(workspaceDir, installedAgents) {
 }
 
 /**
- * Build the fenced markdown section listing installed agents.
+ * Build the fenced markdown section.
+ * Each installed agent's full agent.md content is embedded inline so any AI CLI
+ * that reads AGENTS.md (Gemini/Antigravity, Claude, Cursor, etc.) automatically
+ * has the complete instructions without needing explicit file references.
+ *
+ * @param {string} workspaceDir
+ * @param {object[]} agents
+ * @returns {string}
  */
-function buildSection(agents) {
+function buildSection(workspaceDir, agents) {
   const lines = [
     '<!-- amlog:start -->',
-    '## amlog — Installed Agents',
+    '# amlog — Installed Agents',
     '',
-    '> This section is managed by `amlog`. Do not edit manually.',
+    '> Managed by `amlog`. Do not edit this section manually — run `amlog update` to refresh.',
     '',
-    '| Agent | Type | Stage | Description |',
-    '|-------|------|-------|-------------|',
+    '## How to invoke an agent',
+    '',
+    'Tell your AI assistant to act as a specific agent by name, e.g.:',
+    '- _"Act as `planner-amlog` and create a plan for story #42"_',
+    '- _"Run `implementor-amlog` on the backend"_',
+    '',
+    'Or reference the agent file directly in your session:',
+    '```',
+    '@.amlog/agents/<type>/<name>/agent.md',
+    '```',
+    '',
+    '---',
+    '',
   ];
 
+  // Group agents by type for readability
+  const byType = {};
   for (const a of agents) {
-    lines.push(`| \`${a.name}\` | \`${a.type}\` | ${a.stage} | ${a.description} |`);
+    if (!byType[a.type]) byType[a.type] = [];
+    byType[a.type].push(a);
   }
 
-  lines.push('');
-  lines.push('**Usage:** Each agent lives under `.amlog/agents/<type>/<name>/agent.md`.');
-  lines.push('Reference it in your agent CLI session by pointing at that path.');
-  lines.push('<!-- amlog:end -->');
+  for (const [type, list] of Object.entries(byType)) {
+    lines.push(`## ${type} agents`);
+    lines.push('');
 
+    for (const agent of list) {
+      const agentFilePath = path.join(
+        workspaceDir,
+        '.amlog', 'agents', agent.type, agent.name, 'agent.md'
+      );
+
+      lines.push(`### ${agent.name}`);
+      lines.push('');
+
+      if (fs.existsSync(agentFilePath)) {
+        // Embed the full agent.md content so the AI has all instructions loaded
+        const agentContent = fs.readFileSync(agentFilePath, 'utf8').trim();
+        lines.push(agentContent);
+      } else {
+        // Fallback: path reference if file not found (shouldn't happen after install)
+        lines.push(`> **File:** \`.amlog/agents/${agent.type}/${agent.name}/agent.md\``);
+        lines.push(`> ${agent.description}`);
+      }
+
+      lines.push('');
+      lines.push('---');
+      lines.push('');
+    }
+  }
+
+  lines.push('<!-- amlog:end -->');
   return lines.join('\n');
 }
 
 module.exports = { detectAgentInstructionFile, updateAgentInstructionFile };
+
