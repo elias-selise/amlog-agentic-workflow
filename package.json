@@ -1,20 +1,30 @@
 {
   "name": "amlog-workflow",
-  "version": "0.1.3",
+  "version": "0.1.5",
   "description": "Agentic SDLC workflow toolkit — installs role-specific AI agents + CodeGraph knowledge base into any workspace.",
-  "keywords": ["agents", "ai", "sdlc", "codegraph", "workflow", "amlog"],
+  "keywords": [
+    "agents",
+    "ai",
+    "sdlc",
+    "codegraph",
+    "workflow",
+    "amlog"
+  ],
   "author": "Selise",
   "license": "MIT",
   "homepage": "https://github.com/selise/amlog-workflow#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/selise/amlog-workflow.git"
+    "url": "git+https://github.com/selise/amlog-workflow.git"
   },
   "engines": {
     "node": ">=18.0.0"
   },
+  "publishConfig": {
+    "registry": "https://npm.selise.biz"
+  },
   "bin": {
-    "amlog": "./bin/amlog.js"
+    "amlog": "bin/amlog.js"
   },
   "main": "./src/index.js",
   "files": [
