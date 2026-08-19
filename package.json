@@ -1,6 +1,6 @@
 {
   "name": "amlog-workflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Agentic SDLC workflow toolkit — installs role-specific AI agents + CodeGraph knowledge base into any workspace.",
   "keywords": ["agents", "ai", "sdlc", "codegraph", "workflow", "amlog"],
   "author": "Selise",
