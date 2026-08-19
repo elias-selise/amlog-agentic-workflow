@@ -1,5 +1,5 @@
 # install.ps1 — amlog-workflow installer for Windows (PowerShell)
-# Usage: irm https://raw.githubusercontent.com/selise/amlog-workflow/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/selise/amlog-agentic-workflow/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 $Package = "amlog-workflow"

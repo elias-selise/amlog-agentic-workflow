@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # install.sh — amlog-workflow installer for macOS and Linux.
-# Usage: curl -fsSL https://raw.githubusercontent.com/selise/amlog-workflow/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/selise/amlog-agentic-workflow/main/install.sh | sh
 set -e
 
 PACKAGE="amlog-workflow"

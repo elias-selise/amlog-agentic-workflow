@@ -31,10 +31,10 @@ Every install also bootstraps [CodeGraph](https://github.com/colbymchenry/codegr
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/selise/amlog-workflow/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/selise/amlog-agentic-workflow/main/install.sh | sh
 
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/selise/amlog-workflow/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/selise/amlog-agentic-workflow/main/install.ps1 | iex
 
 # Already have Node.js 18+?
 npm i -g amlog-workflow
