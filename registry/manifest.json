@@ -1,0 +1,123 @@
+{
+  "agents": [
+    {
+      "name": "knowledge-base-setup",
+      "type": "dev",
+      "stage": "platform",
+      "description": "Installs and initializes CodeGraph for the workspace knowledge graph.",
+      "path": "knowledge-base-setup"
+    },
+    {
+      "name": "story-writer-amlog",
+      "type": "ba",
+      "stage": "ba",
+      "description": "Turns a raw feature request into a structured story with acceptance criteria.",
+      "path": "agents/ba/story-writer-amlog"
+    },
+    {
+      "name": "kb-updater-amlog",
+      "type": "ba",
+      "stage": "ba",
+      "description": "Proposes glossary and business-rule entries to the local _pending knowledge file.",
+      "path": "agents/ba/kb-updater-amlog"
+    },
+    {
+      "name": "github-manager-amlog",
+      "type": "dev",
+      "stage": "cross-cutting",
+      "description": "Owns card creation, gitmoji commits, branch/PR automation, and board sync.",
+      "path": "agents/dev/github-manager-amlog"
+    },
+    {
+      "name": "researcher-amlog",
+      "type": "dev",
+      "stage": "planning",
+      "description": "Shared research support for libraries, external APIs, and prior art.",
+      "path": "agents/dev/researcher-amlog"
+    },
+    {
+      "name": "security-review-amlog",
+      "type": "dev",
+      "stage": "build",
+      "description": "Scans the diff for injection risks, secrets, and unsafe input handling.",
+      "path": "agents/dev/security-review-amlog"
+    },
+    {
+      "name": "code-quality-amlog",
+      "type": "dev",
+      "stage": "build",
+      "description": "Triggers SonarQube scan and enforces the quality gate.",
+      "path": "agents/dev/code-quality-amlog"
+    },
+    {
+      "name": "review-amlog",
+      "type": "dev",
+      "stage": "build",
+      "description": "Automated pre-review pass against acceptance criteria and existing conventions.",
+      "path": "agents/dev/review-amlog"
+    },
+    {
+      "name": "kb-curator-amlog",
+      "type": "dev",
+      "stage": "platform",
+      "description": "Daily sweep of every repo's _pending files into one PR against the shared knowledge base.",
+      "path": "agents/dev/kb-curator-amlog"
+    },
+    {
+      "name": "planner-amlog",
+      "type": "frontend-dev",
+      "stage": "planning",
+      "description": "Breaks the spec into a front-end implementation plan using codegraph_explore.",
+      "path": "agents/frontend-dev/planner-amlog"
+    },
+    {
+      "name": "implementor-amlog",
+      "type": "frontend-dev",
+      "stage": "build",
+      "description": "Implements the planned Angular front-end changes.",
+      "path": "agents/frontend-dev/implementor-amlog"
+    },
+    {
+      "name": "browser-launcher-amlog",
+      "type": "frontend-dev",
+      "stage": "build",
+      "description": "Starts the dev server, opens a browser, and walks the AC checklist live.",
+      "path": "agents/frontend-dev/browser-launcher-amlog"
+    },
+    {
+      "name": "planner-amlog",
+      "type": "backend-dev",
+      "stage": "planning",
+      "description": "Breaks the spec into a back-end implementation plan using codegraph_explore.",
+      "path": "agents/backend-dev/planner-amlog"
+    },
+    {
+      "name": "implementor-amlog",
+      "type": "backend-dev",
+      "stage": "build",
+      "description": "Implements the planned .NET back-end changes.",
+      "path": "agents/backend-dev/implementor-amlog"
+    },
+    {
+      "name": "test-runner-amlog",
+      "type": "backend-dev",
+      "stage": "build",
+      "description": "Runs codegraph affected + the impacted test suite before hand-off.",
+      "path": "agents/backend-dev/test-runner-amlog"
+    },
+    {
+      "name": "test-generator-amlog",
+      "type": "qa",
+      "stage": "qa",
+      "description": "Writes edge-case tests the pre-QA gate did not cover.",
+      "path": "agents/qa/test-generator-amlog"
+    },
+    {
+      "name": "test-executor-amlog",
+      "type": "qa",
+      "stage": "qa",
+      "description": "Runs the full test suite and reports pass/fail results.",
+      "path": "agents/qa/test-executor-amlog"
+    }
+  ]
+}

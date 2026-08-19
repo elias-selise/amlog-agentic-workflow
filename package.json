@@ -1,0 +1,45 @@
+{
+  "name": "amlog-workflow",
+  "version": "0.1.0",
+  "description": "Agentic SDLC workflow toolkit — installs role-specific AI agents + CodeGraph knowledge base into any workspace.",
+  "keywords": ["agents", "ai", "sdlc", "codegraph", "workflow", "amlog"],
+  "author": "Selise",
+  "license": "MIT",
+  "homepage": "https://github.com/selise/amlog-workflow#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/selise/amlog-workflow.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "bin": {
+    "amlog": "./bin/amlog.js"
+  },
+  "main": "./src/index.js",
+  "files": [
+    "bin/",
+    "src/",
+    "registry/",
+    "install.sh",
+    "install.ps1",
+    "amlog-workflow.config.example.json"
+  ],
+  "scripts": {
+    "test": "node --test src/**/*.test.js",
+    "lint": "eslint src/ bin/",
+    "prepublishOnly": "npm test"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "chalk": "^5.3.0",
+    "ora": "^8.1.0",
+    "fs-extra": "^11.2.0",
+    "yaml": "^2.5.0",
+    "prompts": "^2.4.2",
+    "semver": "^7.6.3"
+  },
+  "devDependencies": {
+    "eslint": "^9.9.0"
+  }
+}

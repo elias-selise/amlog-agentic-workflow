@@ -1,0 +1,10 @@
+{
+  "adapter": "codegraph",
+  "zones": {
+    "frontend": "./frontend",
+    "backend": "./backend",
+    "database": "./database"
+  },
+  "businessDocs": "./docs/business",
+  "output": "./.knowledge-graph"
+}
