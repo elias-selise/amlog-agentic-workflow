@@ -150,6 +150,7 @@ cp node_modules/amlog-workflow/amlog-workflow.config.example.json ./amlog-workfl
 | `knowledge-base-setup` | `dev` | platform | ✅ `setup-knowledge-base.sh` |
 | `story-writer-amlog` | `ba` | ba | — |
 | `kb-updater-amlog` | `ba` | ba | — |
+| `github-manager-amlog` | `ba` | ba | — |
 | `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` |
 | `researcher-amlog` | `dev` | planning | — |
 | `security-review-amlog` | `dev` | build | — |

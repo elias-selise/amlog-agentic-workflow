@@ -23,6 +23,13 @@
     },
     {
       "name": "github-manager-amlog",
+      "type": "ba",
+      "stage": "ba",
+      "description": "Owns card creation and board sync.",
+      "path": "agents/ba/github-manager-amlog"
+    },
+    {
+      "name": "github-manager-amlog",
       "type": "dev",
       "stage": "cross-cutting",
       "description": "Owns card creation, gitmoji commits, branch/PR automation, and board sync.",
