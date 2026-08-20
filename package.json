@@ -1,5 +1,5 @@
 {
-  "name": "@selise/amlog-workflow",
+  "name": "amlog-workflow",
   "version": "0.1.9",
   "description": "Agentic SDLC workflow toolkit — installs role-specific AI agents + CodeGraph knowledge base into any workspace.",
   "keywords": [
