@@ -8,12 +8,46 @@ const chalk = require('chalk');
 const CONFIG_FILE = 'amlog-workflow.config.json';
 
 /**
+ * Get the command or full path to execute codegraph.
+ * If codegraph is on the PATH, returns 'codegraph'.
+ * Otherwise, checks common installation directories to resolve the path dynamically.
+ * @returns {string}
+ */
+function getCodegraphCommand() {
+  try {
+    // If it's on PATH, use it directly
+    execSync('codegraph --version', { stdio: 'ignore' });
+    return 'codegraph';
+  } catch {
+    // Try to find it in common default installation folders
+    const isWindows = process.platform === 'win32';
+    if (isWindows) {
+      const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+      const winPath = path.join(localAppData, 'codegraph', 'current', 'codegraph.cmd');
+      if (fs.existsSync(winPath)) return winPath;
+      const winPathExe = path.join(localAppData, 'codegraph', 'current', 'codegraph.exe');
+      if (fs.existsSync(winPathExe)) return winPathExe;
+      
+      // Check npm global paths
+      const npmPath = path.join(process.env.APPDATA || '', 'npm', 'codegraph.cmd');
+      if (fs.existsSync(npmPath)) return npmPath;
+    } else {
+      const home = process.env.HOME || '';
+      const unixPath = path.join(home, '.codegraph', 'bin', 'codegraph');
+      if (fs.existsSync(unixPath)) return unixPath;
+    }
+    return 'codegraph'; // Fallback
+  }
+}
+
+/**
  * Check if codegraph CLI is installed.
  * @returns {boolean}
  */
 function isCodegraphInstalled() {
+  const cmd = getCodegraphCommand();
   try {
-    execSync('codegraph --version', { stdio: 'ignore' });
+    execSync(`"${cmd}" --version`, { stdio: 'ignore' });
     return true;
   } catch {
     return false;
@@ -65,8 +99,9 @@ function installCodegraph() {
  */
 function wireCodegraph() {
   console.log(chalk.cyan('  Wiring CodeGraph into detected agent CLIs...'));
+  const cmd = getCodegraphCommand();
   spawnSync(
-    'codegraph',
+    cmd,
     ['install', '--target=auto', '--location=global', '--yes'],
     { stdio: 'inherit' }
   );
@@ -101,6 +136,7 @@ function readZones(workspaceDir) {
  * @param {string} workspaceDir
  */
 function initZones(zones, workspaceDir) {
+  const cmd = getCodegraphCommand();
   for (const zone of zones) {
     const target = path.resolve(workspaceDir, zone);
     if (!fs.existsSync(target)) {
@@ -108,7 +144,7 @@ function initZones(zones, workspaceDir) {
       continue;
     }
     console.log(chalk.cyan(`  Indexing zone: ${zone}`));
-    spawnSync('codegraph', ['init'], { cwd: target, stdio: 'inherit' });
+    spawnSync(cmd, ['init'], { cwd: target, stdio: 'inherit' });
   }
 }
 
@@ -119,11 +155,12 @@ function initZones(zones, workspaceDir) {
  * @param {string} workspaceDir
  */
 function printZoneStatus(zones, workspaceDir) {
+  const cmd = getCodegraphCommand();
   for (const zone of zones) {
     const target = path.resolve(workspaceDir, zone);
     if (!fs.existsSync(target)) continue;
     console.log(chalk.bold(`\n  --- ${zone} ---`));
-    spawnSync('codegraph', ['status'], { cwd: target, stdio: 'inherit' });
+    spawnSync(cmd, ['status'], { cwd: target, stdio: 'inherit' });
   }
 }
 
@@ -136,11 +173,13 @@ function printZoneStatus(zones, workspaceDir) {
 async function bootstrapKnowledgeBase(workspaceDir) {
   console.log(chalk.bold.cyan('\n📚 Bootstrapping knowledge base...\n'));
 
+  const cmd = getCodegraphCommand();
+
   // Step 1: Ensure CodeGraph is installed
   if (isCodegraphInstalled()) {
     console.log(chalk.green('  ✓ CodeGraph CLI already installed.'));
     // Check for updates (non-fatal)
-    spawnSync('codegraph', ['upgrade', '--check'], { stdio: 'inherit' });
+    spawnSync(cmd, ['upgrade', '--check'], { stdio: 'inherit' });
   } else {
     installCodegraph();
   }
