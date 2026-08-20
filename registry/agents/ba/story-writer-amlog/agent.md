@@ -20,6 +20,7 @@ Transform a raw product or stakeholder request into a properly structured user s
 6. Flag any ambiguities or missing information as open questions for the stakeholder.
 7. Write the final story to `docs/stories/<story-id>.md` in the workspace.
 8. Summarize the story title and AC count in your final response.
+9. Always ask for user confirmation for AC and Story description
 
 ## Handoff
-Pass the completed story file path to `planner-amlog` (frontend or backend) for implementation planning.
+Pass the completed story file path to `github-manager-amlog` (ba) for syncing with github board.
