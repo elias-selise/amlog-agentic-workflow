@@ -74,6 +74,15 @@ program
     await runStatus();
   });
 
+// amlog doctor
+program
+  .command('doctor')
+  .description('Diagnose the local environment: Node version, CodeGraph resolution, workspace setup')
+  .action(async () => {
+    const { runDoctor } = require('../src/commands/doctor');
+    await runDoctor();
+  });
+
 // Default: interactive installer when no subcommand given
 if (process.argv.length <= 2) {
   (async () => {

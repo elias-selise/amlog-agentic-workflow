@@ -8,6 +8,7 @@ module.exports = {
   upgrade:  require('./commands/upgrade'),
   list:     require('./commands/list'),
   status:   require('./commands/status'),
+  doctor:   require('./commands/doctor'),
   manifest: require('./lib/manifest'),
   copyAgents: require('./lib/copy-agents'),
   detectAgentCli: require('./lib/detect-agent-cli'),
