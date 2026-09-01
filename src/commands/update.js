@@ -6,6 +6,7 @@ const ora = require('ora');
 const { filterAgents } = require('../lib/manifest');
 const { copyAgents, getInstalledTypes } = require('../lib/copy-agents');
 const { updateAgentInstructionFile } = require('../lib/detect-agent-cli');
+const { isCodegraphInstalled, syncZones } = require('../lib/knowledge-base');
 
 const WORKSPACE = process.cwd();
 
@@ -36,6 +37,13 @@ async function runUpdate(opts) {
 
   const instrFile = await updateAgentInstructionFile(WORKSPACE, ok.map(r => r.agent));
   console.log(chalk.gray(`\n  Agent list refreshed in: ${path.relative(WORKSPACE, instrFile)}`));
+
+  // Re-index zones so changes to amlog-workflow.config.json (e.g. a newly added
+  // zone) take effect without a full uninstall/reinstall.
+  if (isCodegraphInstalled()) {
+    console.log(chalk.bold.cyan('\n📚 Syncing knowledge base zones...\n'));
+    syncZones(WORKSPACE);
+  }
 
   console.log(chalk.bold.green(`\n✅ Update complete. ${ok.length} agent(s) refreshed.\n`));
 }

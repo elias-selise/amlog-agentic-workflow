@@ -1,0 +1,80 @@
+name: Install smoke test
+
+# Exercises the local checkout's `amlog` CLI end-to-end (install/status/uninstall) on
+# every supported OS. This intentionally does NOT invoke install.sh / install.ps1:
+# those scripts run `npm install -g amlog-workflow` against the *published* npm
+# package, so they can't be used to test local, unpublished changes.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  smoke-test:
+    name: amlog install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Link local amlog CLI globally
+        run: npm link
+
+      - name: Stub codegraph CLI (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "$HOME/.codegraph/bin"
+          cat > "$HOME/.codegraph/bin/codegraph" <<'EOF'
+          #!/bin/sh
+          echo "codegraph stub: $@"
+          exit 0
+          EOF
+          chmod +x "$HOME/.codegraph/bin/codegraph"
+          echo "$HOME/.codegraph/bin" >> "$GITHUB_PATH"
+
+      - name: Stub codegraph CLI (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:LOCALAPPDATA "codegraph\current"
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          $stub = Join-Path $dir "codegraph.cmd"
+          Set-Content -Path $stub -Value "@echo off`r`necho codegraph stub: %*`r`nexit /b 0"
+
+      - name: Create scratch workspace
+        shell: bash
+        run: mkdir smoke-workspace
+
+      - name: amlog install --ba --yes
+        working-directory: smoke-workspace
+        shell: bash
+        run: |
+          amlog install --ba --yes
+          test -d .amlog/agents/ba
+
+      - name: amlog status
+        working-directory: smoke-workspace
+        shell: bash
+        run: amlog status
+
+      - name: amlog uninstall --yes
+        working-directory: smoke-workspace
+        run: |
+          amlog uninstall --yes
+          if [ -d .amlog ]; then echo "::error::.amlog was not removed"; exit 1; fi
+        shell: bash
