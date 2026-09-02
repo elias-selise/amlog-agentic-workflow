@@ -3,19 +3,45 @@
 const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
+const semver = require('semver');
 const { filterAgents } = require('../lib/manifest');
 const { copyAgents, getInstalledTypes } = require('../lib/copy-agents');
 const { updateAgentInstructionFile } = require('../lib/detect-agent-cli');
 const { isCodegraphInstalled, syncZones } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
+const { runUpgrade, getLatestVersion } = require('./upgrade');
+const { version: currentVersion } = require('../../package.json');
 
 const WORKSPACE = process.cwd();
+
+/**
+ * Check npm for a newer amlog CLI release and self-upgrade in place if found.
+ * Non-fatal: a failed registry lookup just skips the check.
+ */
+async function selfUpdateCli() {
+  console.log(chalk.bold.cyan('\n⬆  Checking for amlog CLI updates...\n'));
+
+  const latest = getLatestVersion();
+  if (!latest) {
+    console.log(chalk.yellow('  Could not reach npm registry — skipping CLI update check.'));
+    return;
+  }
+
+  if (semver.valid(latest) && semver.gt(latest, currentVersion)) {
+    console.log(chalk.yellow(`  New version available: ${currentVersion} → ${latest}`));
+    await runUpgrade();
+  } else {
+    console.log(chalk.green(`  ✓ amlog CLI is up to date (${currentVersion}).`));
+  }
+}
 
 /**
  * `amlog update` — re-pulls latest agent definitions for already-installed roles.
  */
 async function runUpdate(opts) {
   console.log(chalk.bold.cyan('\n🔄 amlog update\n'));
+
+  await selfUpdateCli();
 
   const installedTypes = getInstalledTypes(WORKSPACE);
   if (installedTypes.length === 0) {
