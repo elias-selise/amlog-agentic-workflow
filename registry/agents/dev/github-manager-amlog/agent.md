@@ -20,6 +20,7 @@ Automate all GitHub workflow tasks — creating issues/cards, committing with gi
 6. Request reviewers based on the changed file types (frontend changes → frontend team, backend → backend team).
 7. Move the board card to "In Review" column once the PR is opened.
 8. After merge: close the issue, delete the feature branch, and move the card to "Done".
+9. After fetching the issue from github then create a file under `@docs/plan/` and populate a file name `<issue-number>-specs.md` with the issue details and prototype for the technical details which I will fill up to execute next phase.
 
 ## Handoff
 After PR is merged, hand off to `kb-curator-amlog` if knowledge entries were proposed during this cycle.

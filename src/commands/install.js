@@ -8,6 +8,7 @@ const { resolveTargetTypes, filterAgents } = require('../lib/manifest');
 const { copyAgents } = require('../lib/copy-agents');
 const { updateAgentInstructionFile } = require('../lib/detect-agent-cli');
 const { bootstrapKnowledgeBase } = require('../lib/knowledge-base');
+const { ensureGitignoreEntries } = require('../lib/gitignore');
 
 const WORKSPACE = process.cwd();
 
@@ -76,10 +77,13 @@ async function runInstall(opts) {
   const instrFile = await updateAgentInstructionFile(WORKSPACE, agentDetails);
   console.log(chalk.gray(`\n  Agent list written to: ${path.relative(WORKSPACE, instrFile)}`));
 
-  // 6. Bootstrap knowledge base
+  // 6. Ensure amlog/CodeGraph artifacts are gitignored
+  ensureGitignoreEntries(WORKSPACE);
+
+  // 7. Bootstrap knowledge base
   await bootstrapKnowledgeBase(WORKSPACE);
 
-  // 7. Summary
+  // 8. Summary
   console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent(s) installed.\n`));
   if (failed.length > 0) {
     console.log(chalk.yellow(`  ⚠  ${failed.length} agent(s) failed to copy — check errors above.\n`));
