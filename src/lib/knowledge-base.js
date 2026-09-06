@@ -25,18 +25,14 @@ let cachedCommand = null;
  * If codegraph is on the PATH, returns 'codegraph'.
  * Otherwise, checks common installation directories to resolve the path dynamically.
  * Resolved once per process and cached.
- * Resolved once per process and cached.
  * @returns {string}
  */
 function getCodegraphCommand() {
   if (cachedCommand) return cachedCommand;
 
-  if (cachedCommand) return cachedCommand;
-
   try {
     // If it's on PATH, use it directly
     execSync('codegraph --version', { stdio: 'ignore' });
-    cachedCommand = 'codegraph';
     cachedCommand = 'codegraph';
   } catch {
     // Try to find it in common default installation folders
@@ -49,20 +45,13 @@ function getCodegraphCommand() {
       if (fs.existsSync(winPath)) cachedCommand = winPath;
       else if (fs.existsSync(winPathExe)) cachedCommand = winPathExe;
       else if (fs.existsSync(npmPath)) cachedCommand = npmPath; // Check npm global paths
-      if (fs.existsSync(winPath)) cachedCommand = winPath;
-      else if (fs.existsSync(winPathExe)) cachedCommand = winPathExe;
-      else if (fs.existsSync(npmPath)) cachedCommand = npmPath; // Check npm global paths
     } else {
       const home = process.env.HOME || '';
       const unixPath = path.join(home, '.codegraph', 'bin', 'codegraph');
       if (fs.existsSync(unixPath)) cachedCommand = unixPath;
-      if (fs.existsSync(unixPath)) cachedCommand = unixPath;
     }
     if (!cachedCommand) cachedCommand = 'codegraph'; // Fallback
-    if (!cachedCommand) cachedCommand = 'codegraph'; // Fallback
   }
-
-  return cachedCommand;
 
   return cachedCommand;
 }
@@ -103,10 +92,6 @@ function installCodegraph() {
   // tracking latest/main (see PINNED_CODEGRAPH_VERSION above).
   const installerEnv = { ...process.env, CODEGRAPH_VERSION: `v${PINNED_CODEGRAPH_VERSION}` };
 
-  // Both installer scripts honor CODEGRAPH_VERSION to pin a release instead of
-  // tracking latest/main (see PINNED_CODEGRAPH_VERSION above).
-  const installerEnv = { ...process.env, CODEGRAPH_VERSION: `v${PINNED_CODEGRAPH_VERSION}` };
-
   if (!isWindows) {
     // Try curl first
     const curlCheck = spawnSync('which', ['curl'], { stdio: 'ignore' });
@@ -115,9 +100,7 @@ function installCodegraph() {
         'sh',
         ['-c', 'curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh'],
         { stdio: 'inherit', env: installerEnv }
-        { stdio: 'inherit', env: installerEnv }
       );
-      if (result.status === 0) { cachedCommand = null; return; }
       if (result.status === 0) { cachedCommand = null; return; }
     }
   } else {
@@ -126,15 +109,10 @@ function installCodegraph() {
       'powershell',
       ['-Command', 'irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | iex'],
       { stdio: 'inherit', env: installerEnv }
-      { stdio: 'inherit', env: installerEnv }
     );
-    if (result.status === 0) { cachedCommand = null; return; }
     if (result.status === 0) { cachedCommand = null; return; }
   }
 
-  // Fallback: npm. `which` isn't a native Windows command, so probe npm directly
-  // (with shell: true since npm is a .cmd shim on Windows) instead of pre-checking via `which`.
-  const npmCheck = spawnSync('npm', ['--version'], { stdio: 'ignore', shell: true });
   // Fallback: npm. `which` isn't a native Windows command, so probe npm directly
   // (with shell: true since npm is a .cmd shim on Windows) instead of pre-checking via `which`.
   const npmCheck = spawnSync('npm', ['--version'], { stdio: 'ignore', shell: true });
@@ -145,13 +123,7 @@ function installCodegraph() {
       ['i', '-g', `@colbymchenry/codegraph@${PINNED_CODEGRAPH_VERSION}`],
       { stdio: 'inherit', shell: true }
     );
-    const result = spawnSync(
-      'npm',
-      ['i', '-g', `@colbymchenry/codegraph@${PINNED_CODEGRAPH_VERSION}`],
-      { stdio: 'inherit', shell: true }
-    );
     if (result.status !== 0) throw new Error('Failed to install CodeGraph via npm.');
-    cachedCommand = null;
     cachedCommand = null;
     return;
   }
@@ -216,15 +188,11 @@ function wireCodegraph(targetTools = []) {
   }
 
   console.log(chalk.cyan('  Wiring CodeGraph into detected agent CLIs...'));
-  const cmd = getCodegraphCommand();
   const result = spawnSync(
     cmd,
     ['install', '--target=auto', '--location=global', '--yes'],
     { stdio: 'inherit' }
   );
-  if (result.status !== 0) {
-    console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
-  }
   if (result.status !== 0) {
     console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
   }
@@ -340,9 +308,10 @@ function detectPlausibleZones(workspaceDir) {
  * Mirrors the reference shell script from AGENTS.md Appendix A.
  *
  * @param {string} workspaceDir
+ * @param {string[]} [targetTools] - tool ids to wire CodeGraph into (only the ones not already wired)
  * @param {{ yes?: boolean }} [opts]
  */
-async function bootstrapKnowledgeBase(workspaceDir, opts = {}) {
+async function bootstrapKnowledgeBase(workspaceDir, targetTools = [], opts = {}) {
   console.log(chalk.bold.cyan('\n📚 Bootstrapping knowledge base...\n'));
 
   const cmd = getCodegraphCommand();
@@ -351,10 +320,6 @@ async function bootstrapKnowledgeBase(workspaceDir, opts = {}) {
   if (isCodegraphInstalled()) {
     console.log(chalk.green('  ✓ CodeGraph CLI already installed.'));
     // Check for updates (non-fatal)
-    const upgradeCheck = spawnSync(cmd, ['upgrade', '--check'], { stdio: 'inherit' });
-    if (upgradeCheck.status !== 0) {
-      console.log(chalk.yellow('  WARNING: failed to check for CodeGraph updates.'));
-    }
     const upgradeCheck = spawnSync(cmd, ['upgrade', '--check'], { stdio: 'inherit' });
     if (upgradeCheck.status !== 0) {
       console.log(chalk.yellow('  WARNING: failed to check for CodeGraph updates.'));
@@ -393,7 +358,6 @@ module.exports = {
   readZones,
   initZones,
   printZoneStatus,
-  syncZones,
   syncZones,
   bootstrapKnowledgeBase,
   getCodegraphCommand,

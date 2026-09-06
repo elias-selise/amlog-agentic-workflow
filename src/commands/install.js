@@ -137,7 +137,7 @@ async function runInstall(opts) {
   }
 
   // 6. Bootstrap knowledge base
-  await bootstrapKnowledgeBase(WORKSPACE, opts);
+  await bootstrapKnowledgeBase(WORKSPACE, targetTools, opts);
 
   // 7. Summary
   console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent install(s) completed.\n`));

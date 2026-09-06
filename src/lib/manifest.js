@@ -3,7 +3,6 @@
 const path = require('path');
 const fs = require('fs-extra');
 const { TOOL_IDS } = require('./adapters');
-const { TOOL_IDS } = require('./adapters');
 
 const MANIFEST_PATH = path.join(__dirname, '../../registry/manifest.json');
 
