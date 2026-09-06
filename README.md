@@ -308,6 +308,7 @@ If you don't create this file, `amlog install` will detect a plausible multi-zon
 | `knowledge-base-setup` | `dev` | platform | ✅ `setup-knowledge-base.sh` |
 | `story-writer-amlog` | `ba` | ba | — |
 | `github-ba-manager-amlog` | `ba` | ba | — |
+| `github-ba-manager-amlog` | `ba` | ba | — |
 | `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` |
 | `researcher-amlog` | `dev` | planning | — |
 | `security-review-amlog` | `dev` | build | — |
@@ -343,6 +344,11 @@ tools: [read, write, edit, bash, codegraph_explore]
 `amlog install` converts that definition into **each selected tool's own native format and folder** (see the table in [What is amlog?](#what-is-amlog)), so the tool discovers and can invoke it itself — no manual `@`-referencing needed. Exact invocation syntax is each tool's own (check its docs); roughly:
 
 ```bash
+# Claude Code — auto-discovers .claude/agents/*.md as project subagents
+claude "delegate this to implementor-amlog"
+
+# Codex — auto-discovers .codex/agents/*.toml
+codex "spawn implementor-amlog to build this"
 # Claude Code — auto-discovers .claude/agents/*.md as project subagents
 claude "delegate this to implementor-amlog"
 
