@@ -28,7 +28,7 @@ function tomlMultilineLiteral(value) {
 
 async function write(fileBase, meta, body, workspaceDir) {
   const lines = [
-    `name = ${tomlString(meta.name)}`,
+    `name = ${tomlString(fileBase)}`,
     `description = ${tomlString(meta.description)}`,
     `developer_instructions = ${tomlMultilineLiteral(body.trimEnd())}`,
     '',
