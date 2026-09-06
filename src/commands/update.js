@@ -6,7 +6,7 @@ const semver = require('semver');
 const { filterAgents, loadManifest } = require('../lib/manifest');
 const { installAgents, getInstalledTypes, getInstalledTools } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
-const { isCodegraphInstalled, syncZones } = require('../lib/knowledge-base');
+const { isCodegraphInstalled, syncZones, wireCodegraph } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
 const { runUpgrade, getLatestVersion } = require('./upgrade');
@@ -73,6 +73,10 @@ async function runUpdate(opts) {
   if (isCodegraphInstalled()) {
     console.log(chalk.bold.cyan('\n📚 Syncing knowledge base zones...\n'));
     syncZones(WORKSPACE);
+
+    // Re-wire any installed tool that isn't wired yet (e.g. a tool added to
+    // the workspace, or a global config reset, outside of `amlog install`).
+    wireCodegraph(installedTools);
   }
 
   console.log(chalk.bold.green(`\n✅ Update complete. ${ok.length} agent install(s) refreshed.\n`));

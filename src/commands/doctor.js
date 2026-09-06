@@ -4,8 +4,10 @@ const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 const fs = require('fs-extra');
-const { getCodegraphCommand, isCodegraphInstalled } = require('../lib/knowledge-base');
+const { getCodegraphCommand, isCodegraphInstalled, isCodegraphWiredForTool } = require('../lib/knowledge-base');
 const { detectAgentInstructionFile } = require('../lib/detect-agent-cli');
+const { getInstalledTools } = require('../lib/copy-agents');
+const { getAdapter } = require('../lib/adapters');
 
 const WORKSPACE = process.cwd();
 
@@ -36,6 +38,16 @@ async function runDoctor() {
   console.log(chalk.gray(`  Resolved command: ${cmd}`));
   if (isCodegraphInstalled()) {
     ok('CodeGraph reachable');
+
+    const installedTools = getInstalledTools(WORKSPACE);
+    for (const tool of installedTools) {
+      const label = (() => { try { return getAdapter(tool).label; } catch { return tool; } })();
+      if (isCodegraphWiredForTool(tool)) {
+        ok(`CodeGraph wired for ${label}`);
+      } else {
+        fail(`CodeGraph not wired for ${label}`, 'run `amlog install` or `amlog update` to fix');
+      }
+    }
   } else {
     fail('CodeGraph not reachable', 'run `amlog install` to install it');
   }

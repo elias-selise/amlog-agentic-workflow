@@ -97,7 +97,7 @@ async function runInstall(opts) {
   ensureGitignoreEntries(WORKSPACE);
 
   // 6. Bootstrap knowledge base
-  await bootstrapKnowledgeBase(WORKSPACE);
+  await bootstrapKnowledgeBase(WORKSPACE, targetTools);
 
   // 7. Summary
   console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent install(s) completed.\n`));

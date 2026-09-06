@@ -3,7 +3,7 @@
 const chalk = require('chalk');
 const { getInstalledAgents } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
-const { isCodegraphInstalled, readZones, printZoneStatus } = require('../lib/knowledge-base');
+const { isCodegraphInstalled, isCodegraphWiredForTool, readZones, printZoneStatus } = require('../lib/knowledge-base');
 
 const WORKSPACE = process.cwd();
 
@@ -25,9 +25,17 @@ async function runStatus() {
       if (!byTool[a.tool]) byTool[a.tool] = [];
       byTool[a.tool].push(a);
     }
+    const codegraphAvailable = isCodegraphInstalled();
     for (const [tool, agents] of Object.entries(byTool)) {
       const label = (() => { try { return getAdapter(tool).label; } catch { return tool; } })();
       console.log(chalk.bold(`  ${label}`));
+      if (codegraphAvailable) {
+        if (isCodegraphWiredForTool(tool)) {
+          console.log(chalk.gray('    ✓ CodeGraph wired'));
+        } else {
+          console.log(chalk.yellow('    ✗ CodeGraph not wired — run `amlog install` to fix'));
+        }
+      }
       const byType = {};
       for (const a of agents) {
         if (!byType[a.type]) byType[a.type] = [];
