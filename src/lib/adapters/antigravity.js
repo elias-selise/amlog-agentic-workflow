@@ -17,7 +17,7 @@ function filePath(workspaceDir, fileBase) {
 
 async function write(fileBase, meta, body, workspaceDir) {
   const frontmatter = {
-    name: meta.name,
+    name: fileBase,
     description: meta.description,
     ...(meta.tools ? { tools: meta.tools } : {}),
     mainAgent: false,
