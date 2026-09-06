@@ -13,7 +13,7 @@ Use CodeGraph's impact analysis to identify which tests are affected by the curr
 
 ## Instructions
 1. Run `scripts/run-affected-tests.sh` to invoke `codegraph affected` and get the list of impacted files.
-2. Map the affected source files to their corresponding test project paths in `@../l3-net-lim-service`.
+2. Map the affected source files to their corresponding test project paths in codebase.
 3. Run `dotnet test --filter <affected-test-classes>` targeting only the impacted test classes.
 4. Capture the full test output: total tests, passed, failed, skipped, and execution time.
 5. If any tests fail: print the failure message and the failing test name clearly.

@@ -13,7 +13,7 @@ Start the Angular development server, open the application in a browser, and sys
 
 ## Instructions
 1. Run `scripts/launch-browser.sh` to start `ng serve` and open the app in the default browser.
-2. Read the story file `docs/stories/<story-id>.md` and extract the acceptance criteria checklist.
+2. Read the story file `docs/<issue-number>/instructions.md` and extract the acceptance criteria checklist.
 3. For each AC item, navigate to the relevant part of the application and manually verify the behaviour.
 4. Record each AC as PASS or FAIL with a brief note on what was observed.
 5. If any AC fails: note the exact UI state, the expected behaviour, and the component/route involved.

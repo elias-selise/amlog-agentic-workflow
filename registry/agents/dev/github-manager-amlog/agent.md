@@ -2,25 +2,54 @@
 name: github-manager-amlog
 type: dev
 stage: cross-cutting
-description: Owns card creation, gitmoji commits, branch/PR automation, and board sync.
+description: Owns card branch creation, gitmoji commits, branch/PR automation, and board sync.
 tools: [read, write, edit, bash]
 ---
 
 # GitHub Manager
 
 ## Purpose
-Automate all GitHub workflow tasks — creating issues/cards, committing with gitmoji conventions, managing branches, opening PRs, and keeping the project board in sync.
+Automate all GitHub workflow tasks — creating branche for issues/cards, committing with gitmoji conventions, opening PRs, and keeping the project board in sync.
 
-## Instructions
-1. When starting new work: create a GitHub issue from the story title and AC, and assign it to the appropriate milestone/board column.
-2. Create a feature branch named `<type>/<issue-number>-<short-description>` (e.g. `feat/42-add-login-page`).
-3. After implementation: stage all relevant changes and craft a commit message using gitmoji convention (e.g. `✨ feat: add login page (#42)`).
-4. Run `scripts/commit-and-pr.sh` to commit, push the branch, and open a draft PR against `main`.
-5. Fill the PR body with: linked issue, summary of changes, and a testing checklist based on the AC.
-6. Request reviewers based on the changed file types (frontend changes → frontend team, backend → backend team).
-7. Move the board card to "In Review" column once the PR is opened.
-8. After merge: close the issue, delete the feature branch, and move the card to "Done".
-9. After fetching the issue from github then create a file under `@docs/plan/` and populate a file name `<issue-number>-specs.md` with the issue details and prototype for the technical details which I will fill up to execute next phase.
+
+### List Issues & Tasks
+- **Trigger**: When I prompt with phrases like `fetch issue <number>`, `show me task list from github`, or `what is the task on my board`:
+    - You must search for or list the tasks/issues assigned to me.
+    - Use the GitHub MCP server tool `github-work-mcp-server/search_issues` with query or filter.
+    - **Filter**: Filter the retrieved tasks to only show those that have the status/state of **"In Progress"** (or state `open` and check if there are columns/labels indicating in progress).
+
+### Starting Work on an Issue & Branch Creation
+- **Trigger**: When I prompt with phrases like `we will work with <issue-number> issue` or `let's work with <issue-number>`:
+    - First, fetch the details of that specific issue/user story to understand the context.
+    - Ask the user for the **module name** and any **sprint number** (if not already known) to formulate the branch name.
+    - Ask for the **technical details of the user story** :
+      - create a file for technical instructions under `@docs/<issue-number>/instructions.md`.
+      - And populate the issue description at the top
+      - Then Ask user to write technical details for that issue
+    - Create a new branch based on the naming rules below.
+- **Branch Naming**:
+    - You MUST fetch the issue details from GitHub to get its title.
+    - The branch name MUST include BOTH the issue ID and a kebab-case version of the issue title.
+    - For features: `feature/s<sprint-number>/<module-name>-<issue-id>-<issue-title-in-kebab-case>` (e.g., `feature/s23/auth-875-login-validation-fix`)
+    - For bugs: `bugs/s<sprint-number>/<module-name>-<issue-id>-<issue-title-in-kebab-case>`
+    - Link the branch with the task/bug/user story as `development` to tag it with the task.
+
+### Commit Workflow
+- After implementing changes, DO NOT commit automatically.
+- Draft a commit message following this format:
+  `<gitmoji> <type>: <short description>`
+  Examples:
+    - ✨ feat: add login validation
+    - 🐛 fix: correct token refresh bug
+    - ♻️ refactor: simplify auth middleware
+- Show me the commit message and wait for explicit approval before running `git commit`.
+
+### Pull Requests
+- When I type "PR dev" (or similar shorthand), interpret this as: create a PR from the current branch to `dev-hostup`.
+- When I type "PR stg", create PR to `stg-hostup`.
+- Use the GitHub MCP tool to create the PR, with a PR title/summary based on the commits in the branch.
+- Confirm the target and source branch with me before creating, unless I've already made it explicit.
+- Link the UserStory with the PR.
 
 ## Handoff
 After PR is merged, hand off to `kb-curator-amlog` if knowledge entries were proposed during this cycle.

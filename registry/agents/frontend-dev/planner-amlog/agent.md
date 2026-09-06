@@ -12,14 +12,15 @@ tools: [read, write, codegraph_explore]
 Translate a user story and AC into a concrete, step-by-step Angular implementation plan by exploring the existing codebase structure and conventions.
 
 ## Instructions
-1. Read the story file from `docs/stories/<story-id>.md` and the research summary from `docs/research/<story-id>-research.md` (if available).
-2. Use `codegraph_explore` on `@../l3-angular-lim-business` to understand the relevant module, component, and service structure.
+1. Read the story file from `docs/<issue-number>/instructions.md` and the research summary from `docs/<issue-number>/research.md` (if available).
+2. Use `codegraph_explore` to understand the relevant module, component, and service structure.
 3. Identify which existing Angular components, services, and modules will be affected or extended.
 4. List new files to create: components, services, pipes, guards, or modules — with their proposed paths.
 5. Define the data flow: which API endpoints will be consumed and what the expected request/response shapes are.
 6. Identify any shared state changes (NgRx store, signals, or services) required.
 7. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
-8. Write the plan to `docs/plans/frontend-<story-id>.md` and confirm it covers all AC.
+8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
+9. After writing the `docs/<issue-number>/plan.md` file ask user, if he need to research on this plan or not. If user said he wants to research then invoke `researcher-amlog` agent to independently research on the plan.
 
 ## Handoff
 Pass the plan file to `implementor-amlog` (frontend-dev) to begin coding.

@@ -49,11 +49,16 @@ async function runDoctor() {
     fail('No agent instruction file found', 'AGENTS.md / CLAUDE.md / GEMINI.md / CURSOR.md');
   }
 
-  const amlogDir = path.join(WORKSPACE, '.amlog');
-  if (fs.existsSync(amlogDir)) {
-    ok('.amlog/ present');
+  const stateFile = path.join(WORKSPACE, '.amlog', 'state.json');
+  if (fs.existsSync(stateFile)) {
+    ok('.amlog/state.json present', 'agents installed — see `amlog status`');
   } else {
-    fail('.amlog/ missing', 'run `amlog install` in this workspace');
+    fail('.amlog/state.json missing', 'run `amlog install` in this workspace');
+  }
+
+  const legacyDir = path.join(WORKSPACE, '.amlog', 'agents');
+  if (fs.existsSync(legacyDir)) {
+    fail('Legacy .amlog/agents/ found', 'run `amlog install` or `amlog update` to migrate');
   }
   console.log();
 }

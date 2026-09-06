@@ -12,8 +12,8 @@ tools: [read, write, edit, bash, codegraph_explore]
 Execute the Angular implementation plan, writing production-quality code that passes all acceptance criteria and follows existing codebase conventions.
 
 ## Instructions
-1. Read the implementation plan from `docs/plans/frontend-<story-id>.md`.
-2. Use `codegraph_explore` on `@../l3-angular-lim-business` to understand component patterns, module structure, and coding style before writing any code.
+1. Read the implementation plan from `docs/<issue-number>/plan.md`.
+2. Use `codegraph_explore` on codebase to understand component patterns, module structure, and coding style before writing any code.
 3. Create or modify Angular components, services, and modules exactly as specified in the plan.
 4. Follow the project's existing naming conventions, file structure, and barrel-export patterns.
 5. Wire up API calls using the project's existing HTTP service or interceptors — do not introduce new HTTP client patterns.
