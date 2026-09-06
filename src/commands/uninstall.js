@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs-extra');
 const chalk = require('chalk');
 const prompts = require('prompts');
+const { uninstallAgents, getInstalledAgents } = require('../lib/copy-agents');
 
 const WORKSPACE = process.cwd();
 const AMLOG_DIR      = path.join(WORKSPACE, '.amlog');
@@ -11,13 +12,15 @@ const CODEGRAPH_DIR  = path.join(WORKSPACE, '.codegraph');
 const KNOWLEDGE_DIR  = path.join(WORKSPACE, '.knowledge-graph');
 
 /**
- * `amlog uninstall` — removes agents and optionally the knowledge base.
+ * `amlog uninstall` — removes agents (from their native tool locations) and
+ * optionally the knowledge base.
  */
 async function runUninstall(opts) {
   console.log(chalk.bold.cyan('\n🗑  amlog uninstall\n'));
 
-  if (!fs.existsSync(AMLOG_DIR)) {
-    console.log(chalk.yellow('  .amlog/ not found in this workspace — nothing to remove.'));
+  const installed = getInstalledAgents(WORKSPACE);
+  if (installed.length === 0) {
+    console.log(chalk.yellow('  No agents installed in this workspace (per .amlog/state.json) — nothing to remove.'));
     return;
   }
 
@@ -27,16 +30,20 @@ async function runUninstall(opts) {
       type: 'confirm',
       name: 'ok',
       message: keepKb
-        ? 'Remove .amlog/ agents (keep knowledge base)?'
-        : 'Remove .amlog/ agents AND knowledge base dirs?',
+        ? `Remove ${installed.length} installed agent(s) (keep knowledge base)?`
+        : `Remove ${installed.length} installed agent(s) AND knowledge base dirs?`,
       initial: false,
     });
     if (!ok) { console.log(chalk.yellow('Cancelled.')); process.exit(0); }
   }
 
-  // Remove .amlog/
-  await fs.remove(AMLOG_DIR);
-  console.log(chalk.green('  ✓ Removed .amlog/'));
+  const removed = await uninstallAgents(WORKSPACE);
+  removed.forEach(r => console.log(chalk.green(`  ✓ Removed [${r.tool}] ${r.type}/${r.name}`)));
+
+  if (fs.existsSync(AMLOG_DIR)) {
+    await fs.remove(AMLOG_DIR);
+    console.log(chalk.green('  ✓ Removed .amlog/ (scripts + state)'));
+  }
 
   if (!opts.keepKnowledgeBase) {
     for (const dir of [CODEGRAPH_DIR, KNOWLEDGE_DIR]) {

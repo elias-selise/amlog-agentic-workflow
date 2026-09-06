@@ -1,15 +1,18 @@
 'use strict';
 
-const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
 const prompts = require('prompts');
-const { resolveTargetTypes, filterAgents } = require('../lib/manifest');
-const { copyAgents } = require('../lib/copy-agents');
-const { updateAgentInstructionFile } = require('../lib/detect-agent-cli');
+const { resolveTargetTypes, resolveTargetTools, filterAgents, loadManifest } = require('../lib/manifest');
+const { installAgents } = require('../lib/copy-agents');
+const { TOOL_IDS, getAdapter } = require('../lib/adapters');
 const { bootstrapKnowledgeBase } = require('../lib/knowledge-base');
+const { ensureGitignoreEntries } = require('../lib/gitignore');
+const { runMigration } = require('../lib/migrate');
 
 const WORKSPACE = process.cwd();
+
+const TOOL_CHOICES = TOOL_IDS.map((id) => ({ title: getAdapter(id).label, value: id }));
 
 /**
  * `amlog install` command.
@@ -18,6 +21,8 @@ const WORKSPACE = process.cwd();
  */
 async function runInstall(opts) {
   console.log(chalk.bold.cyan('\n🔧 amlog install\n'));
+
+  await runMigration(WORKSPACE, { yes: opts.yes });
 
   // If no role flags were provided, prompt interactively
   const hasRole = opts.frontend || opts.backend || opts.qa || opts.ba || opts.all || opts.target;
@@ -38,9 +43,25 @@ async function runInstall(opts) {
     opts[role] = true;
   }
 
-  // 1. Resolve target types
+  // If no tool flags were provided, prompt interactively (multi-select)
+  const hasTool = TOOL_IDS.some((id) => opts[id]) || opts.tools;
+  if (!hasTool) {
+    const { tools } = await prompts({
+      type: 'multiselect',
+      name: 'tools',
+      message: 'Which AI tool(s) do you want to install agents for?',
+      choices: TOOL_CHOICES,
+      min: 1,
+    });
+    if (!tools || tools.length === 0) { console.log(chalk.yellow('Cancelled.')); process.exit(0); }
+    for (const t of tools) opts[t] = true;
+  }
+
+  // 1. Resolve target types + tools
   const targetTypes = resolveTargetTypes(opts);
-  console.log(chalk.gray(`  Target types: ${targetTypes.join(', ')}\n`));
+  const targetTools = resolveTargetTools(opts);
+  console.log(chalk.gray(`  Target types: ${targetTypes.join(', ')}`));
+  console.log(chalk.gray(`  Target tools: ${targetTools.map((t) => getAdapter(t).label).join(', ')}\n`));
 
   // 2. Filter agents from manifest
   const agents = filterAgents(targetTypes);
@@ -54,35 +75,34 @@ async function runInstall(opts) {
     const { ok } = await prompts({
       type: 'confirm',
       name: 'ok',
-      message: `Install ${agents.length} agent(s) into ${WORKSPACE}?`,
+      message: `Install ${agents.length} agent(s) for ${targetTools.length} tool(s) into ${WORKSPACE}?`,
       initial: true,
     });
     if (!ok) { console.log(chalk.yellow('Cancelled.')); process.exit(0); }
   }
 
-  // 4. Copy agents
-  const spinner = ora('Copying agents...').start();
-  const results = await copyAgents(agents, WORKSPACE);
+  // 4. Install agents (converted per-tool, natively)
+  const { agents: allAgents } = loadManifest();
+  const spinner = ora('Installing agents...').start();
+  const results = await installAgents(agents, targetTools, WORKSPACE, allAgents);
   spinner.stop();
 
   const ok = results.filter(r => r.ok);
   const failed = results.filter(r => !r.ok);
 
-  ok.forEach(r => console.log(chalk.green(`  ✓ ${r.agent.type}/${r.agent.name}`)));
-  failed.forEach(r => console.log(chalk.red(`  ✗ ${r.agent.type}/${r.agent.name}: ${r.error}`)));
+  ok.forEach(r => console.log(chalk.green(`  ✓ [${r.tool}] ${r.agent.type}/${r.agent.name}`)));
+  failed.forEach(r => console.log(chalk.red(`  ✗ [${r.tool}] ${r.agent.type}/${r.agent.name}: ${r.error}`)));
 
-  // 5. Update agent instruction file
-  const agentDetails = ok.map(r => r.agent);
-  const instrFile = await updateAgentInstructionFile(WORKSPACE, agentDetails);
-  console.log(chalk.gray(`\n  Agent list written to: ${path.relative(WORKSPACE, instrFile)}`));
+  // 5. Ensure amlog/CodeGraph artifacts are gitignored
+  ensureGitignoreEntries(WORKSPACE);
 
   // 6. Bootstrap knowledge base
-  await bootstrapKnowledgeBase(WORKSPACE);
+  await bootstrapKnowledgeBase(WORKSPACE, targetTools);
 
   // 7. Summary
-  console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent(s) installed.\n`));
+  console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent install(s) completed.\n`));
   if (failed.length > 0) {
-    console.log(chalk.yellow(`  ⚠  ${failed.length} agent(s) failed to copy — check errors above.\n`));
+    console.log(chalk.yellow(`  ⚠  ${failed.length} agent install(s) failed — check errors above.\n`));
   }
 }
 

@@ -19,6 +19,11 @@ program
   .option('--ba', 'Install BA agents')
   .option('--all', 'Install all agents')
   .option('--target <types>', 'Comma-separated agent types (e.g. frontend-dev,qa)')
+  .option('--claude', 'Install native Claude Code subagents (.claude/agents/)')
+  .option('--antigravity', 'Install native Antigravity subagents (.agents/agents/)')
+  .option('--codex', 'Install native Codex subagents (.codex/agents/)')
+  .option('--opencode', 'Install native OpenCode subagents (.opencode/agent/)')
+  .option('--tools <ids>', 'Comma-separated tool ids (e.g. claude,codex)')
   .option('--yes', 'Skip interactive prompts')
   .option('--location <scope>', 'Where CLI config lives: global | local', 'global')
   .action(async (opts) => {

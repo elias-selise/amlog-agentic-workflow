@@ -114,11 +114,62 @@ function installCodegraph() {
 }
 
 /**
- * Wire CodeGraph MCP server into detected agent CLIs.
+ * Check whether CodeGraph's MCP server is already wired into a specific
+ * agent CLI's own global config file (e.g. ~/.claude.json for `claude`).
+ * Asks CodeGraph itself where that config lives (`--print-config`) instead
+ * of hardcoding per-tool/per-OS paths, since CodeGraph owns that mapping.
+ *
+ * @param {string} toolId - e.g. 'claude', 'codex', 'opencode', 'antigravity'
+ * @returns {boolean}
  */
-function wireCodegraph() {
-  console.log(chalk.cyan('  Wiring CodeGraph into detected agent CLIs...'));
+function isCodegraphWiredForTool(toolId) {
   const cmd = getCodegraphCommand();
+  const result = spawnSync(cmd, ['install', '--print-config', toolId], { encoding: 'utf8' });
+  if (result.status !== 0) return false;
+
+  const match = (result.stdout || '').match(/# Add to (.+)/);
+  if (!match) return false;
+
+  const configPath = match[1].trim();
+  if (!fs.existsSync(configPath)) return false;
+
+  try {
+    return fs.readFileSync(configPath, 'utf8').includes('codegraph');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Wire CodeGraph MCP server into agent CLIs. When `targetTools` is given,
+ * only wires the tools among them that aren't already wired (skipping the
+ * shell-out entirely if all of them already are); otherwise falls back to
+ * `--target=auto`, letting CodeGraph detect and wire whatever it finds.
+ *
+ * @param {string[]} [targetTools]
+ */
+function wireCodegraph(targetTools = []) {
+  const cmd = getCodegraphCommand();
+
+  if (targetTools.length > 0) {
+    const toWire = targetTools.filter((t) => !isCodegraphWiredForTool(t));
+    if (toWire.length === 0) {
+      console.log(chalk.green(`  ✓ CodeGraph already wired for: ${targetTools.join(', ')}`));
+      return;
+    }
+    console.log(chalk.cyan(`  Wiring CodeGraph into: ${toWire.join(', ')}...`));
+    const result = spawnSync(
+      cmd,
+      ['install', `--target=${toWire.join(',')}`, '--location=global', '--yes'],
+      { stdio: 'inherit' }
+    );
+    if (result.status !== 0) {
+      console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
+    }
+    return;
+  }
+
+  console.log(chalk.cyan('  Wiring CodeGraph into detected agent CLIs...'));
   const result = spawnSync(
     cmd,
     ['install', '--target=auto', '--location=global', '--yes'],
@@ -206,7 +257,7 @@ function syncZones(workspaceDir) {
  *
  * @param {string} workspaceDir
  */
-async function bootstrapKnowledgeBase(workspaceDir) {
+async function bootstrapKnowledgeBase(workspaceDir, targetTools = []) {
   console.log(chalk.bold.cyan('\n📚 Bootstrapping knowledge base...\n'));
 
   const cmd = getCodegraphCommand();
@@ -223,8 +274,8 @@ async function bootstrapKnowledgeBase(workspaceDir) {
     installCodegraph();
   }
 
-  // Step 2: Wire into agent CLIs
-  wireCodegraph();
+  // Step 2: Wire into agent CLIs (only the tools that aren't already wired)
+  wireCodegraph(targetTools);
 
   // Step 3: Init zones
   const zones = readZones(workspaceDir);
@@ -237,6 +288,7 @@ async function bootstrapKnowledgeBase(workspaceDir) {
 
 module.exports = {
   isCodegraphInstalled,
+  isCodegraphWiredForTool,
   installCodegraph,
   wireCodegraph,
   readZones,

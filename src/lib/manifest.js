@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs-extra');
+const { TOOL_IDS } = require('./adapters');
 
 const MANIFEST_PATH = path.join(__dirname, '../../registry/manifest.json');
 
@@ -53,4 +54,24 @@ function filterAgents(targetTypes) {
   return manifest.agents.filter(a => targetTypes.includes(a.type));
 }
 
-module.exports = { loadManifest, resolveTargetTypes, filterAgents };
+/**
+ * Resolve tool flags/options into a list of adapter tool ids.
+ *
+ * @param {object} opts - commander options object
+ * @returns {string[]} deduplicated array of tool ids, e.g. ['claude', 'codex']
+ */
+function resolveTargetTools(opts) {
+  const tools = new Set();
+
+  for (const toolId of TOOL_IDS) {
+    if (opts[toolId]) tools.add(toolId);
+  }
+
+  if (opts.tools) {
+    opts.tools.split(',').map(t => t.trim()).filter(Boolean).forEach(t => tools.add(t));
+  }
+
+  return [...tools];
+}
+
+module.exports = { loadManifest, resolveTargetTypes, filterAgents, resolveTargetTools };

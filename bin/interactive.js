@@ -8,6 +8,7 @@
 const prompts = require('prompts');
 const chalk = require('chalk');
 const { runInstall } = require('../src/commands/install');
+const { TOOL_IDS, getAdapter } = require('../src/lib/adapters');
 
 async function runInteractive() {
   console.log(chalk.bold.cyan('\n  🚀  amlog — Agentic SDLC Workflow\n'));
@@ -33,7 +34,21 @@ async function runInteractive() {
     process.exit(0);
   }
 
+  const { tools } = await prompts({
+    type: 'multiselect',
+    name: 'tools',
+    message: 'Which AI tool(s) do you want to install agents for?',
+    choices: TOOL_IDS.map((id) => ({ title: getAdapter(id).label, value: id })),
+    min: 1,
+  });
+
+  if (!tools || tools.length === 0) {
+    console.log(chalk.yellow('\n  Cancelled.\n'));
+    process.exit(0);
+  }
+
   const opts = { [role]: true, yes: false };
+  for (const t of tools) opts[t] = true;
   await runInstall(opts);
 }
 
