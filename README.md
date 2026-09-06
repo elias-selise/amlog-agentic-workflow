@@ -190,7 +190,7 @@ cp node_modules/amlog-workflow/amlog-workflow.config.example.json ./amlog-workfl
 |---|---|---|---|
 | `knowledge-base-setup` | `dev` | platform | ✅ `setup-knowledge-base.sh` |
 | `story-writer-amlog` | `ba` | ba | — |
-| `github-manager-amlog` | `ba` | ba | — |
+| `github-ba-manager-amlog` | `ba` | ba | — |
 | `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` |
 | `researcher-amlog` | `dev` | planning | — |
 | `security-review-amlog` | `dev` | build | — |
@@ -205,9 +205,9 @@ cp node_modules/amlog-workflow/amlog-workflow.config.example.json ./amlog-workfl
 | `test-generator-amlog` | `qa` | qa | — |
 | `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` |
 
-Several names above are shared across two roles (e.g. `github-manager-amlog`
-under both `ba` and `dev`, `planner-amlog`/`implementor-amlog` under both
-`frontend-dev` and `backend-dev`). Since native tool folders are flat
+Several names above are shared across two roles (e.g.
+`planner-amlog`/`implementor-amlog` under both `frontend-dev` and
+`backend-dev`). Since native tool folders are flat
 (one file per name), amlog automatically suffixes the installed filename
 with the role when a collision like this is selected together — e.g.
 `planner-amlog--frontend-dev.md` and `planner-amlog--backend-dev.md` side
