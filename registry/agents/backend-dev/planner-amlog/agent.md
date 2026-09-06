@@ -19,7 +19,7 @@ Translate a user story and AC into a concrete, step-by-step .NET implementation 
 5. Define the API contract: HTTP method, route, request body DTO, response DTO, and HTTP status codes.
 6. Identify any new database migrations required and describe the schema change.
 7. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
-8. Write the plan to `docs/<issue-number>/instructions.md` and confirm it covers all AC.
+8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
 
 ## Handoff
 Pass the plan file to `implementor-amlog` (backend-dev) to begin coding.

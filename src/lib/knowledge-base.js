@@ -4,8 +4,15 @@ const { execSync, spawnSync } = require('child_process');
 const path = require('path');
 const fs = require('fs-extra');
 const chalk = require('chalk');
+const { confirm } = require('./prompt-utils');
 
 const CONFIG_FILE = 'amlog-workflow.config.json';
+
+// Files whose presence in an immediate subdirectory suggests it's its own
+// sub-project (a plausible separate CodeGraph zone), e.g. a frontend/ dir
+// with its own package.json alongside a backend/ dir with its own .csproj.
+const ZONE_MARKER_FILES = ['package.json', 'go.mod', 'pom.xml'];
+const ZONE_MARKER_EXTENSIONS = ['.csproj', '.sln'];
 
 // Pinned CodeGraph release known to work with this amlog version. Bump deliberately
 // (and re-test `amlog install`) rather than always tracking upstream's latest/main.
@@ -61,6 +68,17 @@ function isCodegraphInstalled() {
   } catch {
     return false;
   }
+}
+
+/**
+ * Describe the install method that will be tried first for this OS, for
+ * display to the user before anything actually runs.
+ * @returns {string}
+ */
+function describeInstallMethod() {
+  return process.platform === 'win32'
+    ? 'irm | iex (PowerShell), falling back to npm if that fails'
+    : 'curl | sh, falling back to npm if that fails';
 }
 
 /**
@@ -252,12 +270,48 @@ function syncZones(workspaceDir) {
 }
 
 /**
+ * Scan immediate subdirectories of workspaceDir for their own project marker
+ * file (package.json, go.mod, pom.xml, *.csproj, *.sln), suggesting each is a
+ * separate sub-project that could be its own CodeGraph zone.
+ *
+ * @param {string} workspaceDir
+ * @returns {string[]} relative subdirectory names that look like separate zones
+ */
+function detectPlausibleZones(workspaceDir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(workspaceDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+    const dir = path.join(workspaceDir, entry.name);
+    let dirEntries;
+    try {
+      dirEntries = fs.readdirSync(dir);
+    } catch {
+      continue;
+    }
+    const hasMarker = dirEntries.some((f) =>
+      ZONE_MARKER_FILES.includes(f) || ZONE_MARKER_EXTENSIONS.includes(path.extname(f))
+    );
+    if (hasMarker) candidates.push(entry.name);
+  }
+  return candidates;
+}
+
+/**
  * Full knowledge-base bootstrap sequence.
  * Mirrors the reference shell script from AGENTS.md Appendix A.
  *
  * @param {string} workspaceDir
+ * @param {string[]} [targetTools] - tool ids to wire CodeGraph into (only the ones not already wired)
+ * @param {{ yes?: boolean }} [opts]
  */
-async function bootstrapKnowledgeBase(workspaceDir, targetTools = []) {
+async function bootstrapKnowledgeBase(workspaceDir, targetTools = [], opts = {}) {
   console.log(chalk.bold.cyan('\n📚 Bootstrapping knowledge base...\n'));
 
   const cmd = getCodegraphCommand();
@@ -271,6 +325,16 @@ async function bootstrapKnowledgeBase(workspaceDir, targetTools = []) {
       console.log(chalk.yellow('  WARNING: failed to check for CodeGraph updates.'));
     }
   } else {
+    const proceed = await confirm(
+      opts,
+      `CodeGraph CLI not found. Install it now via ${describeInstallMethod()}?`
+    );
+    if (!proceed) {
+      console.log(chalk.yellow(
+        '  Skipped — re-run `amlog install` (or `amlog update`) later to set up the knowledge base.'
+      ));
+      return;
+    }
     installCodegraph();
   }
 
@@ -297,4 +361,5 @@ module.exports = {
   syncZones,
   bootstrapKnowledgeBase,
   getCodegraphCommand,
+  detectPlausibleZones,
 };

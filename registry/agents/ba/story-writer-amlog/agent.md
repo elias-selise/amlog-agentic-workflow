@@ -24,4 +24,4 @@ Transform a raw product or stakeholder request into a properly structured user s
 9. ALWAYS ask for user CONFIRMATION for AC and Story description
 
 ## Handoff
-Pass the completed story file path to `github-manager-amlog` (ba) for syncing with github board.
+Pass the completed story file path to `github-ba-manager-amlog` for syncing with github board.

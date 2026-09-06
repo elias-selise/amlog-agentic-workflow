@@ -12,7 +12,7 @@ tools: [read, write, edit, bash, codegraph_explore]
 Analyse the implementation and its existing tests to identify and write edge-case tests that were missed by the developer's own test suite.
 
 ## Instructions
-1. Read the story AC from `docs/stories/<story-id>.md` and the implementation plan.
+1. Read the story AC from `docs/<issue-number>/instructions.md` and the implementation plan.
 2. Use `codegraph_explore` to read the current test files for the changed components/services.
 3. Identify AC edge cases not covered by existing tests: boundary values, null/empty inputs, unauthorised access, concurrent requests.
 4. For Angular: write new Jasmine/Jest specs in the appropriate `.spec.ts` file covering each edge case.

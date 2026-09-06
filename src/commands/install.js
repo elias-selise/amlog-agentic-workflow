@@ -1,14 +1,19 @@
 'use strict';
 
+const path = require('path');
+const fs = require('fs-extra');
 const chalk = require('chalk');
 const ora = require('ora');
 const prompts = require('prompts');
-const { resolveTargetTypes, resolveTargetTools, filterAgents, loadManifest } = require('../lib/manifest');
+const { resolveTargetTypes, resolveTargetTools, filterAgents, loadManifest, getKnownTypes } = require('../lib/manifest');
 const { installAgents } = require('../lib/copy-agents');
 const { TOOL_IDS, getAdapter } = require('../lib/adapters');
-const { bootstrapKnowledgeBase } = require('../lib/knowledge-base');
+const { bootstrapKnowledgeBase, detectPlausibleZones } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
+const { canPrompt } = require('../lib/prompt-utils');
+
+const CONFIG_FILE = 'amlog-workflow.config.json';
 
 const WORKSPACE = process.cwd();
 
@@ -64,10 +69,24 @@ async function runInstall(opts) {
   console.log(chalk.gray(`  Target tools: ${targetTools.map((t) => getAdapter(t).label).join(', ')}\n`));
 
   // 2. Filter agents from manifest
-  const agents = filterAgents(targetTypes);
+  let agents = filterAgents(targetTypes);
   if (agents.length === 0) {
-    console.log(chalk.yellow('  No agents matched the specified types. Check amlog list.'));
-    return;
+    if (canPrompt(opts)) {
+      console.log(chalk.yellow(`  No agents matched: ${targetTypes.join(', ')}`));
+      const { types } = await prompts({
+        type: 'multiselect',
+        name: 'types',
+        message: 'Pick valid agent type(s) instead:',
+        choices: getKnownTypes().map((t) => ({ title: t, value: t })),
+        min: 1,
+      });
+      if (!types || types.length === 0) { console.log(chalk.yellow('Cancelled.')); process.exit(0); }
+      agents = filterAgents(types);
+    }
+    if (agents.length === 0) {
+      console.log(chalk.yellow('  No agents matched the specified types. Check amlog list.'));
+      return;
+    }
   }
 
   // 3. Confirm unless --yes
@@ -96,8 +115,29 @@ async function runInstall(opts) {
   // 5. Ensure amlog/CodeGraph artifacts are gitignored
   ensureGitignoreEntries(WORKSPACE);
 
+  // 5b. Offer to configure multi-zone CodeGraph indexing if this looks like a
+  // multi-project repo and no config exists yet
+  const configPath = path.join(WORKSPACE, CONFIG_FILE);
+  if (!fs.existsSync(configPath) && canPrompt(opts)) {
+    const candidates = detectPlausibleZones(WORKSPACE);
+    if (candidates.length >= 2) {
+      const { zones } = await prompts({
+        type: 'multiselect',
+        name: 'zones',
+        message: 'This looks like a multi-zone repo — index these as separate CodeGraph zones?',
+        choices: candidates.map((c) => ({ title: c, value: c })),
+      });
+      if (zones && zones.length > 0) {
+        const zoneMap = {};
+        for (const z of zones) zoneMap[z] = z;
+        fs.writeJsonSync(configPath, { zones: zoneMap }, { spaces: 2 });
+        console.log(chalk.green(`  ✓ Wrote ${CONFIG_FILE}`));
+      }
+    }
+  }
+
   // 6. Bootstrap knowledge base
-  await bootstrapKnowledgeBase(WORKSPACE, targetTools);
+  await bootstrapKnowledgeBase(WORKSPACE, targetTools, opts);
 
   // 7. Summary
   console.log(chalk.bold.green(`\n✅ Done! ${ok.length} agent install(s) completed.\n`));
