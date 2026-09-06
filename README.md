@@ -10,6 +10,7 @@
 ## What is amlog?
 
 `amlog` is a CLI that installs a curated set of role-specific AI agents **natively** into whichever AI coding tool(s) you use, alongside a live code-knowledge graph. Each agent is defined once in a shared registry and converted into the exact subagent format each tool expects — no copy-pasting, no format mismatches.
+`amlog` is a CLI that installs a curated set of role-specific AI agents **natively** into whichever AI coding tool(s) you use, alongside a live code-knowledge graph. Each agent is defined once in a shared registry and converted into the exact subagent format each tool expects — no copy-pasting, no format mismatches.
 
 **Agents are organized by SDLC role:**
 
@@ -19,7 +20,19 @@
 | `--backend` | planner, implementor (.NET), test-runner + all `dev` agents |
 | `--qa` | test-generator, test-executor |
 | `--ba` | story-writer, github-manager |
+| `--ba` | story-writer, github-manager |
 | `--all` | everything above |
+
+**And installed for whichever tool(s) you pick:**
+
+| Tool | Flag | Native location | Format |
+|---|---|---|---|
+| Claude Code | `--claude` | `.claude/agents/<name>.md` | Markdown + YAML frontmatter |
+| Codex | `--codex` | `.codex/agents/<name>.toml` | TOML |
+| OpenCode | `--opencode` | `.opencode/agent/<name>.md` | Markdown + YAML frontmatter |
+| Antigravity | `--antigravity` | `.agents/agents/<name>.md` | Markdown + YAML frontmatter |
+
+You can select more than one tool at once (`--claude --codex`), and installing for a new tool later never re-copies or duplicates agents already installed for another — each tool gets its own native files, tracked independently.
 
 **And installed for whichever tool(s) you pick:**
 
@@ -57,6 +70,7 @@ npx amlog-workflow
 > **Requires Node.js 18+** — Node is needed for the `npm` install path. The `curl`/`irm` path will also install via npm for v1.
 
 ### Step 2 — Pick your role
+### Step 2 — Pick your role
 
 ```bash
 cd my-project
@@ -66,6 +80,16 @@ amlog install --backend    # .NET developer
 amlog install --qa         # QA engineer
 amlog install --ba         # Business Analyst
 amlog install --all        # Everyone
+```
+
+### Step 3 — Pick your tool(s)
+
+Add one or more tool flags to the same command (or omit them to get an interactive multi-select prompt):
+
+```bash
+amlog install --frontend --claude                # Claude Code only
+amlog install --frontend --claude --codex        # Claude Code + Codex, in one pass
+amlog install --backend --tools=opencode,antigravity
 ```
 
 ### Step 3 — Pick your tool(s)
@@ -94,6 +118,21 @@ Older versions of `amlog` installed every agent as generic markdown under a shar
 - Strip just the `<!-- amlog:start --> … <!-- amlog:end -->` section it added to your instruction file, leaving everything else in that file untouched.
 
 Nothing else changes — run the command with your usual role + tool flags right after, and agents get installed the new, native way.
+- Agents are installed **natively** into each selected tool's own folder (see the table above) — the tool discovers and invokes them itself, no extra wiring needed.
+- Companion scripts some agents ship with live in `.amlog/scripts/<agent-name>/` (gitignored), referenced by relative path from the agent's instructions.
+- A small `.amlog/state.json` (also gitignored) tracks which roles/tools are installed, so `amlog status`, `amlog update`, and `amlog uninstall` know what to manage.
+- CodeGraph is installed and your codebase is indexed.
+
+---
+
+## Upgrading from a pre-native install
+
+Older versions of `amlog` installed every agent as generic markdown under a shared `.amlog/agents/<type>/<name>/` tree, and embedded the roster as prose into `AGENTS.md`/`CLAUDE.md`. If your workspace still has that layout, the **next** `amlog install` or `amlog update` you run will detect it automatically, show you exactly what it's about to remove, and (after a confirmation, unless you pass `--yes`):
+
+- Delete the old `.amlog/agents/` tree.
+- Strip just the `<!-- amlog:start --> … <!-- amlog:end -->` section it added to your instruction file, leaving everything else in that file untouched.
+
+Nothing else changes — run the command with your usual role + tool flags right after, and agents get installed the new, native way.
 
 ---
 
@@ -103,9 +142,14 @@ Nothing else changes — run the command with your usual role + tool flags right
 amlog                          Interactive installer (prompts for role, then tool)
 amlog install [flags]          Install agents natively for the selected tool(s) + bootstrap knowledge base
 amlog update                   Refresh installed roles/tools to latest definitions
+amlog                          Interactive installer (prompts for role, then tool)
+amlog install [flags]          Install agents natively for the selected tool(s) + bootstrap knowledge base
+amlog update                   Refresh installed roles/tools to latest definitions
 amlog uninstall [flags]        Remove agents (and optionally the KB) from this workspace
 amlog upgrade [version]        Update the amlog CLI itself
 amlog list                     Show every agent in the registry
+amlog status                   Show installed agents (by tool + role) + CodeGraph index stats
+amlog doctor                   Diagnose the local environment + detect a legacy .amlog/agents/ install
 amlog status                   Show installed agents (by tool + role) + CodeGraph index stats
 amlog doctor                   Diagnose the local environment + detect a legacy .amlog/agents/ install
 amlog version                  Print installed CLI version
@@ -127,8 +171,16 @@ amlog version                  Print installed CLI version
 | `--antigravity` | install | Install native Antigravity subagents |
 | `--tools <csv>` | install | Explicit tool ids: `claude,codex,opencode,antigravity` |
 | `--yes` | install, update, uninstall | Skip confirmation prompts |
+| `--claude` | install | Install native Claude Code subagents |
+| `--codex` | install | Install native Codex subagents |
+| `--opencode` | install | Install native OpenCode subagents |
+| `--antigravity` | install | Install native Antigravity subagents |
+| `--tools <csv>` | install | Explicit tool ids: `claude,codex,opencode,antigravity` |
+| `--yes` | install, update, uninstall | Skip confirmation prompts |
 | `--location <scope>` | install | `global` \| `local` (default: `global`) |
 | `--keep-knowledge-base` | uninstall | Remove agents only, keep `.codegraph/` and `.knowledge-graph/` |
+
+Role flags and tool flags combine freely — e.g. `amlog install --backend --qa --claude --codex` installs both roles for both tools in one pass. `amlog update` re-resolves whichever roles/tools are already recorded in `.amlog/state.json`, so it doesn't need either flag.
 
 Role flags and tool flags combine freely — e.g. `amlog install --backend --qa --claude --codex` installs both roles for both tools in one pass. `amlog update` re-resolves whichever roles/tools are already recorded in `.amlog/state.json`, so it doesn't need either flag.
 
@@ -221,6 +273,9 @@ collision for the roles you installed.
 Each agent is defined once in the shared registry as a markdown file with
 YAML frontmatter (`name`, `type`, `stage`, `description`, `tools`) — the
 source of truth `amlog` converts from. Example:
+Each agent is defined once in the shared registry as a markdown file with
+YAML frontmatter (`name`, `type`, `stage`, `description`, `tools`) — the
+source of truth `amlog` converts from. Example:
 
 ```yaml
 ---
@@ -236,6 +291,10 @@ tools: [read, write, edit, bash, codegraph_explore]
 native format and folder** (see the table in [What is amlog?](#what-is-amlog)),
 so the tool discovers and can invoke it itself — no manual `@`-referencing
 needed. Exact invocation syntax is each tool's own (check its docs); roughly:
+`amlog install` converts that definition into **each selected tool's own
+native format and folder** (see the table in [What is amlog?](#what-is-amlog)),
+so the tool discovers and can invoke it itself — no manual `@`-referencing
+needed. Exact invocation syntax is each tool's own (check its docs); roughly:
 
 ```bash
 # Claude Code — auto-discovers .claude/agents/*.md as project subagents
@@ -243,7 +302,23 @@ claude "delegate this to implementor-amlog"
 
 # Codex — auto-discovers .codex/agents/*.toml
 codex "spawn implementor-amlog to build this"
+# Claude Code — auto-discovers .claude/agents/*.md as project subagents
+claude "delegate this to implementor-amlog"
 
+# Codex — auto-discovers .codex/agents/*.toml
+codex "spawn implementor-amlog to build this"
+
+# OpenCode — auto-discovers .opencode/agent/*.md
+opencode run --agent implementor-amlog "..."
+
+# Antigravity — auto-discovers .agents/agents/*.md
+agy --agent implementor-amlog "..."
+```
+
+Any companion shell script an agent ships with (e.g. `run-test-suite.sh`)
+is copied to `.amlog/scripts/<agent-name>/` once per workspace, and every
+native agent file references it there — regardless of which tool(s) you
+installed for.
 # OpenCode — auto-discovers .opencode/agent/*.md
 opencode run --agent implementor-amlog "..."
 
@@ -265,6 +340,7 @@ amlog status
 ```
 
 Shows:
+- Which agents are installed, grouped by tool and then by role
 - Which agents are installed, grouped by tool and then by role
 - Whether CodeGraph is installed
 - Live index stats (files, symbols, edges) per zone

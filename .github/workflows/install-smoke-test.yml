@@ -60,12 +60,12 @@ jobs:
         shell: bash
         run: mkdir smoke-workspace
 
-      - name: amlog install --ba --yes
+      - name: amlog install --ba --claude --yes
         working-directory: smoke-workspace
         shell: bash
         run: |
-          amlog install --ba --yes
-          test -d .amlog/agents/ba
+          amlog install --ba --claude --yes
+          test -d .claude/agents
 
       - name: amlog status
         working-directory: smoke-workspace
