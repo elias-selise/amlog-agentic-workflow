@@ -11,14 +11,17 @@ const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
 const { runUpgrade, getLatestVersion } = require('./upgrade');
 const { version: currentVersion } = require('../../package.json');
+const { confirm } = require('../lib/prompt-utils');
 
 const WORKSPACE = process.cwd();
 
 /**
  * Check npm for a newer amlog CLI release and self-upgrade in place if found.
  * Non-fatal: a failed registry lookup just skips the check.
+ *
+ * @param {object} [opts] - CLI options (checks opts.yes)
  */
-async function selfUpdateCli() {
+async function selfUpdateCli(opts = {}) {
   console.log(chalk.bold.cyan('\n⬆  Checking for amlog CLI updates...\n'));
 
   const latest = getLatestVersion();
@@ -29,7 +32,12 @@ async function selfUpdateCli() {
 
   if (semver.valid(latest) && semver.gt(latest, currentVersion)) {
     console.log(chalk.yellow(`  New version available: ${currentVersion} → ${latest}`));
-    await runUpgrade();
+    const proceed = await confirm(opts, `Upgrade amlog CLI ${currentVersion} → ${latest} now?`);
+    if (proceed) {
+      await runUpgrade();
+    } else {
+      console.log(chalk.yellow('  Skipped — run `amlog upgrade` later.'));
+    }
   } else {
     console.log(chalk.green(`  ✓ amlog CLI is up to date (${currentVersion}).`));
   }
@@ -41,7 +49,7 @@ async function selfUpdateCli() {
 async function runUpdate(opts) {
   console.log(chalk.bold.cyan('\n🔄 amlog update\n'));
 
-  await selfUpdateCli();
+  await selfUpdateCli(opts);
   await runMigration(WORKSPACE, { yes: opts.yes });
 
   const installedTypes = getInstalledTypes(WORKSPACE);

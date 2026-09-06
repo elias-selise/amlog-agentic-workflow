@@ -55,6 +55,17 @@ function filterAgents(targetTypes) {
 }
 
 /**
+ * All distinct agent `type` values present in the manifest, e.g. for
+ * offering valid choices when a `--target` value matches nothing.
+ *
+ * @returns {string[]}
+ */
+function getKnownTypes() {
+  const manifest = loadManifest();
+  return [...new Set(manifest.agents.map(a => a.type))];
+}
+
+/**
  * Resolve tool flags/options into a list of adapter tool ids.
  *
  * @param {object} opts - commander options object
@@ -74,4 +85,4 @@ function resolveTargetTools(opts) {
   return [...tools];
 }
 
-module.exports = { loadManifest, resolveTargetTypes, filterAgents, resolveTargetTools };
+module.exports = { loadManifest, resolveTargetTypes, filterAgents, resolveTargetTools, getKnownTypes };
