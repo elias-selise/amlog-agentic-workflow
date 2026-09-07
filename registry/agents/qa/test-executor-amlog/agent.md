@@ -3,7 +3,7 @@ name: test-executor-amlog
 type: qa
 stage: qa
 description: Runs the full test suite and reports pass/fail results.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Test Executor

@@ -3,7 +3,7 @@ name: implementor-amlog
 type: backend-dev
 stage: build
 description: Implements the planned .NET back-end changes.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 ---
 
 # Backend Implementor

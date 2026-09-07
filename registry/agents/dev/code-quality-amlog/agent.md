@@ -3,7 +3,7 @@ name: code-quality-amlog
 type: dev
 stage: build
 description: Triggers SonarQube scan and enforces the quality gate.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Code Quality

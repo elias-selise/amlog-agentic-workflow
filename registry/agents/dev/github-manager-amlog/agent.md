@@ -3,7 +3,7 @@ name: github-manager-amlog
 type: dev
 stage: cross-cutting
 description: Owns card branch creation, gitmoji commits, branch/PR automation, and board sync.
-tools: [read, write, edit, bash]
+tools: [Read, Write, Edit, Bash]
 ---
 
 # GitHub Manager

@@ -3,7 +3,7 @@ name: browser-launcher-amlog
 type: frontend-dev
 stage: build
 description: Starts the dev server, opens a browser, and walks the AC checklist live.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Browser Launcher

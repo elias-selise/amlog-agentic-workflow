@@ -3,7 +3,7 @@ name: planner-amlog
 type: frontend-dev
 stage: planning
 description: Breaks the spec into a front-end implementation plan using codegraph_explore.
-tools: [read, write, codegraph_explore]
+tools: [Read, Write, mcp__codegraph__codegraph_explore]
 ---
 
 # Frontend Planner

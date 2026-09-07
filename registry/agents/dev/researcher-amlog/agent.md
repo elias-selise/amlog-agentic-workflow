@@ -3,7 +3,7 @@ name: researcher-amlog
 type: dev
 stage: planning
 description: Shared research support for libraries, external APIs, and prior art.
-tools: [read, bash, codegraph_explore]
+tools: [Read, Bash, mcp__codegraph__codegraph_explore]
 ---
 
 # Researcher

@@ -3,7 +3,7 @@ name: security-review-amlog
 type: dev
 stage: build
 description: Scans the diff for injection risks, secrets, and unsafe input handling.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Security Reviewer

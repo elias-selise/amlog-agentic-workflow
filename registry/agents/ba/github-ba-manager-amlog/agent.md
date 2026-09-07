@@ -3,7 +3,7 @@ name: github-ba-manager-amlog
 type: ba
 stage: ba
 description: Owns card creation and board sync.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # GitHub Manager

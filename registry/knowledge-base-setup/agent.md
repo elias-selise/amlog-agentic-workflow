@@ -3,7 +3,7 @@ name: knowledge-base-setup
 type: dev
 stage: platform
 description: Installs and initializes CodeGraph for the workspace knowledge graph.
-tools: [bash, read]
+tools: [Bash, Read]
 ---
 
 # Knowledge Base Setup

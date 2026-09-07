@@ -3,7 +3,7 @@ name: implementor-amlog
 type: frontend-dev
 stage: build
 description: Implements the planned Angular front-end changes.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 ---
 
 # Frontend Implementor
