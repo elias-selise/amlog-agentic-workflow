@@ -1,5 +1,5 @@
 ---
-name: github-ba-manager-amlog
+name: github-manager-ba-amlog
 type: ba
 stage: ba
 description: Owns card creation and board sync.

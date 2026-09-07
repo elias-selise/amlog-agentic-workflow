@@ -64,12 +64,12 @@ npx amlog-workflow
 ```bash
 cd my-project
 
-amlog install --frontend        # frontend-dev + dev (cross-cutting) agents
-amlog install --backend         # backend-dev + dev agents
+amlog install --frontend        # fe + dev (cross-cutting) agents
+amlog install --backend         # be + dev agents
 amlog install --qa              # qa
 amlog install --ba              # ba
 amlog install --all             # everything
-amlog install --target=frontend-dev,qa   # explicit csv, for anyone who wants more than one role
+amlog install --target=fe,qa   # explicit csv, for anyone who wants more than one role
 ```
 
 Every `amlog install` invocation also runs the knowledge-base bootstrap
@@ -108,7 +108,7 @@ amlog version                  Print installed CLI version
 
 | Flag | Values | Applies to |
 |---|---|---|
-| `--target` | csv of types: `ba,frontend-dev,backend-dev,qa,dev` | `install`, `update` |
+| `--target` | csv of types: `ba,fe,be,qa,dev` | `install`, `update` |
 | `--frontend` / `--backend` / `--qa` / `--ba` / `--all` | shorthand for `--target=<type>,dev` (dev is cross-cutting, always included) | `install` |
 | `--yes` | skip prompts | `install`, `uninstall` |
 | `--location` | `global` \| `local` | `install` — where the CLI's own config lives, same meaning as CodeGraph's flag |
@@ -121,7 +121,7 @@ amlog version                  Print installed CLI version
 Step by step — this is the core logic the CLI's `install` command needs to
 implement:
 
-1. Resolve `--frontend` → `target = ["frontend-dev", "dev"]`.
+1. Resolve `--frontend` → `target = ["fe", "dev"]`.
 2. Read `registry/manifest.json` (bundled in the npm package) and filter to
    agents whose `type` is in `target`.
 3. Copy each matching agent's whole folder (`agent.md` + its `scripts/` if
@@ -196,7 +196,7 @@ one.
 
 > **Naming note:** the front-end and back-end implementation agents share
 > the exact same name, `implementor-amlog` — they are distinguished only by
-> their `type` field (`frontend-dev` vs `backend-dev`), not by name. This
+> their `type` field (`fe` vs `be`), not by name. This
 > is intentional; don't rename one of them to disambiguate.
 
 | Name | Type | Stage | Needs a script? | Purpose |
@@ -206,12 +206,12 @@ one.
 | `kb-updater` | `ba` | ba | — | Proposes glossary/business-rule entries to the local `_pending` file |
 | `github-manager-amlog` | `dev` | cross-cutting | optional: `commit-and-pr.sh` | Owns card creation, gitmoji commits, branch/PR automation, board sync |
 | `researcher-amlog` | `dev` | planning | — | Shared research support for either planner (libraries, external APIs, prior art) |
-| `planner-amlog` | `frontend-dev` | planning | — | Breaks spec into a front-end implementation plan, using `codegraph_explore` |
-| `planner-amlog` | `backend-dev` | planning | — | Breaks spec into a back-end implementation plan, using `codegraph_explore` |
-| `implementor-amlog` | `frontend-dev` | build | — | Implements the planned Angular changes |
-| `implementor-amlog` | `backend-dev` | build | — | Implements the planned .NET changes (same name, different type — see note above) |
-| `browser-launcher-amlog` | `frontend-dev` | build | ✅ `launch-browser.sh` | Starts the dev server, opens a browser, walks the AC checklist live |
-| `test-runner-amlog` | `backend-dev` | build | ✅ `run-affected-tests.sh` | Runs `codegraph affected` + the impacted test suite before hand-off |
+| `planner-amlog` | `fe` | planning | — | Breaks spec into a front-end implementation plan, using `codegraph_explore` |
+| `planner-amlog` | `be` | planning | — | Breaks spec into a back-end implementation plan, using `codegraph_explore` |
+| `implementor-amlog` | `fe` | build | — | Implements the planned Angular changes |
+| `implementor-amlog` | `be` | build | — | Implements the planned .NET changes (same name, different type — see note above) |
+| `browser-launcher-amlog` | `fe` | build | ✅ `launch-browser.sh` | Starts the dev server, opens a browser, walks the AC checklist live |
+| `test-runner-amlog` | `be` | build | ✅ `run-affected-tests.sh` | Runs `codegraph affected` + the impacted test suite before hand-off |
 | `security-review-amlog` | `dev` | build | — | Scans the diff for injection risks, secrets, unsafe input handling |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | Triggers SonarQube scan, enforces the quality gate |
 | `review-amlog` | `dev` | build | — | Automated pre-review pass against AC and existing conventions |
@@ -237,7 +237,7 @@ all agents so `amlog list` and any orchestrator can parse it uniformly:
 ```markdown
 ---
 name: implementor-amlog
-type: frontend-dev
+type: fe
 stage: build
 description: One sentence, third person, describing what this agent does.
 tools: [read, write, edit, bash, codegraph_explore]
@@ -300,11 +300,11 @@ amlog-workflow/
 │       │   ├── code-quality-amlog/agent.md + scripts/run-sonarqube.sh
 │       │   ├── review-amlog/agent.md
 │       │   └── kb-curator-amlog/agent.md + scripts/curate-knowledge.sh
-│       ├── frontend-dev/
+│       ├── fe/
 │       │   ├── planner-amlog/agent.md
 │       │   ├── implementor-amlog/agent.md
 │       │   └── browser-launcher-amlog/agent.md + scripts/launch-browser.sh
-│       ├── backend-dev/
+│       ├── be/
 │       │   ├── planner-amlog/agent.md
 │       │   ├── implementor-amlog/agent.md
 │       │   └── test-runner-amlog/agent.md + scripts/run-affected-tests.sh
@@ -316,8 +316,8 @@ amlog-workflow/
 ```
 
 Note both `implementor-amlog` folders exist side by side under different
-`type` parents (`frontend-dev/implementor-amlog/` and
-`backend-dev/implementor-amlog/`) — same folder name, different path, which
+`type` parents (`fe/implementor-amlog/` and
+`be/implementor-amlog/`) — same folder name, different path, which
 is how the same agent name can carry two different `type` values without
 a filename collision.
 
@@ -330,17 +330,17 @@ a filename collision.
   "agents": [
     {
       "name": "implementor-amlog",
-      "type": "frontend-dev",
+      "type": "fe",
       "stage": "build",
       "description": "Implements the planned Angular front-end changes.",
-      "path": "agents/frontend-dev/implementor-amlog"
+      "path": "agents/fe/implementor-amlog"
     },
     {
       "name": "implementor-amlog",
-      "type": "backend-dev",
+      "type": "be",
       "stage": "build",
       "description": "Implements the planned .NET back-end changes.",
-      "path": "agents/backend-dev/implementor-amlog"
+      "path": "agents/be/implementor-amlog"
     }
   ]
 }
@@ -382,17 +382,17 @@ Before considering the build done, confirm:
 - [ ] `npx amlog-workflow` runs the interactive installer without a global
       install.
 - [ ] `amlog install --frontend` in an empty test repo produces
-      `.amlog/agents/frontend-dev/` and `.amlog/agents/dev/` only — no
-      `backend-dev` or `qa` agents present.
+      `.amlog/agents/fe/` and `.amlog/agents/dev/` only — no
+      `be` or `qa` agents present.
 - [ ] The same command also installs CodeGraph if missing, and runs
       `codegraph init` against whatever zones are declared (or the repo
       root if no config file exists).
 - [ ] `amlog install --backend` in the same repo, run afterward, adds
-      `backend-dev/` alongside the existing `frontend-dev/` without
+      `be/` alongside the existing `fe/` without
       duplicating or breaking the `dev/` folder already present.
 - [ ] Both `implementor-amlog` folders exist independently
-      (`frontend-dev/implementor-amlog/` and
-      `backend-dev/implementor-amlog/`) and `amlog list` shows both as
+      (`fe/implementor-amlog/` and
+      `be/implementor-amlog/`) and `amlog list` shows both as
       separate entries with the same name but different `type`.
 - [ ] `amlog uninstall` removes `.amlog/` cleanly; `--keep-knowledge-base`
       leaves `.codegraph/` and `.knowledge-graph/` untouched.

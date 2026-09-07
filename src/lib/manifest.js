@@ -28,11 +28,11 @@ function resolveTargetTypes(opts) {
   const types = new Set();
 
   if (opts.all) {
-    return ['ba', 'frontend-dev', 'backend-dev', 'qa', 'dev'];
+    return ['ba', 'fe', 'be', 'qa', 'dev'];
   }
 
-  if (opts.frontend) { types.add('frontend-dev'); types.add('dev'); }
-  if (opts.backend)  { types.add('backend-dev');  types.add('dev'); }
+  if (opts.frontend) { types.add('fe'); types.add('dev'); }
+  if (opts.backend)  { types.add('be'); types.add('dev'); }
   if (opts.qa)       { types.add('qa');            types.add('dev'); }
   if (opts.ba)       { types.add('ba'); }
 
