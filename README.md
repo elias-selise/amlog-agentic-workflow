@@ -43,7 +43,7 @@ In short, one command gives your AI coding assistant(s):
 | `--frontend` | planner, implementor (Angular), browser-launcher + all `dev` agents |
 | `--backend` | planner, implementor (.NET), test-runner + all `dev` agents |
 | `--qa` | test-generator, test-executor |
-| `--ba` | story-writer, github-ba-manager |
+| `--ba` | story-writer, github-manager-ba |
 | `--all` | everything above |
 
 `dev` agents (researcher, security-review, code-quality, review, github-manager, knowledge-base-setup) are cross-cutting and get pulled in automatically alongside `--frontend`, `--backend`, or `--all`.
@@ -59,7 +59,7 @@ In short, one command gives your AI coding assistant(s):
 
 You can select more than one tool at once (`--claude --codex`), and installing for a new tool later never re-copies or duplicates agents already installed for another — each tool gets its own native files, tracked independently in `.amlog/state.json`.
 
-> **Note on name collisions:** a few agent names (e.g. `planner-amlog`, `implementor-amlog`) exist under more than one role (`frontend-dev` and `backend-dev`). Because each native tool folder is flat (one file per name), amlog automatically suffixes the installed filename with the role whenever both are selected together — e.g. `planner-amlog--frontend-dev.md` and `planner-amlog--backend-dev.md` side by side, each with a matching unique `name:` in its frontmatter so the host tool never sees a duplicate. You'll only see the plain `<name>.md` when there's no collision for the roles you installed.
+> **Note on name collisions:** a few agent names (e.g. `planner-amlog`, `implementor-amlog`) exist under more than one role (`fe` and `be`). Because each native tool folder is flat (one file per name), amlog automatically suffixes the installed filename with the role whenever both are selected together — e.g. `planner-amlog--fe.md` and `planner-amlog--be.md` side by side, each with a matching unique `name:` in its frontmatter so the host tool never sees a duplicate. You'll only see the plain `<name>.md` when there's no collision for the roles you installed.
 
 Every install also bootstraps [CodeGraph](https://github.com/colbymchenry/codegraph) so agents have a real, queryable knowledge graph of your codebase from day one.
 
@@ -108,7 +108,7 @@ amlog install --all        # Everyone / every role
 Prefer explicit control over which agent *types* get pulled in? Use `--target` instead of a role shorthand:
 
 ```bash
-amlog install --target frontend-dev,qa
+amlog install --target fe,qa
 ```
 
 ### Step 3 — Pick your tool(s)
@@ -186,12 +186,12 @@ Installs agents into the current workspace and bootstraps CodeGraph. Any role/to
 
 | Flag | Description |
 |---|---|
-| `--frontend` | Shorthand for `--target=frontend-dev,dev` |
-| `--backend` | Shorthand for `--target=backend-dev,dev` |
+| `--frontend` | Shorthand for `--target=fe,dev` |
+| `--backend` | Shorthand for `--target=be,dev` |
 | `--qa` | Shorthand for `--target=qa` |
 | `--ba` | Shorthand for `--target=ba` |
 | `--all` | All roles |
-| `--target <csv>` | Explicit types: `frontend-dev,backend-dev,qa,ba,dev` |
+| `--target <csv>` | Explicit types: `fe,be,qa,ba,dev` |
 | `--claude` | Install native Claude Code subagents (`.claude/agents/`) |
 | `--codex` | Install native Codex subagents (`.codex/agents/`) |
 | `--opencode` | Install native OpenCode subagents (`.opencode/agent/`) |
@@ -307,19 +307,18 @@ If you don't create this file, `amlog install` will detect a plausible multi-zon
 |---|---|---|---|
 | `knowledge-base-setup` | `dev` | platform | ✅ `setup-knowledge-base.sh` |
 | `story-writer-amlog` | `ba` | ba | — |
-| `github-ba-manager-amlog` | `ba` | ba | — |
-| `github-ba-manager-amlog` | `ba` | ba | — |
+| `github-manager-ba-amlog` | `ba` | ba | — |
 | `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` |
 | `researcher-amlog` | `dev` | planning | — |
 | `security-review-amlog` | `dev` | build | — |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` |
 | `review-amlog` | `dev` | build | — |
-| `planner-amlog` | `frontend-dev` | planning | — |
-| `implementor-amlog` | `frontend-dev` | build | — |
-| `browser-launcher-amlog` | `frontend-dev` | build | ✅ `launch-browser.sh` |
-| `planner-amlog` | `backend-dev` | planning | — |
-| `implementor-amlog` | `backend-dev` | build | — |
-| `test-runner-amlog` | `backend-dev` | build | ✅ `run-affected-tests.sh` |
+| `planner-amlog` | `fe` | planning | — |
+| `implementor-amlog` | `fe` | build | — |
+| `browser-launcher-amlog` | `fe` | build | ✅ `launch-browser.sh` |
+| `planner-amlog` | `be` | planning | — |
+| `implementor-amlog` | `be` | build | — |
+| `test-runner-amlog` | `be` | build | ✅ `run-affected-tests.sh` |
 | `test-generator-amlog` | `qa` | qa | — |
 | `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` |
 
@@ -334,7 +333,7 @@ Each agent is defined once in the shared registry (`registry/agents/<type>/<agen
 ```yaml
 ---
 name: implementor-amlog
-type: frontend-dev
+type: fe
 stage: build
 description: Implements the planned Angular front-end changes.
 tools: [read, write, edit, bash, codegraph_explore]

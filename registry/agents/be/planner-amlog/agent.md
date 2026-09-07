@@ -1,6 +1,6 @@
 ---
 name: planner-amlog
-type: backend-dev
+type: be
 stage: planning
 description: Breaks the spec into a back-end implementation plan using codegraph_explore.
 tools: [read, write, codegraph_explore]
@@ -22,4 +22,4 @@ Translate a user story and AC into a concrete, step-by-step .NET implementation 
 8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
 
 ## Handoff
-Pass the plan file to `implementor-amlog` (backend-dev) to begin coding.
+Pass the plan file to `implementor-amlog` (be) to begin coding.

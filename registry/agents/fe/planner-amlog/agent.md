@@ -1,6 +1,6 @@
 ---
 name: planner-amlog
-type: frontend-dev
+type: fe
 stage: planning
 description: Breaks the spec into a front-end implementation plan using codegraph_explore.
 tools: [read, write, codegraph_explore]
@@ -23,4 +23,4 @@ Translate a user story and AC into a concrete, step-by-step Angular implementati
 9. After writing the `docs/<issue-number>/plan.md` file ask user, if he need to research on this plan or not. If user said he wants to research then invoke `researcher-amlog` agent to independently research on the plan.
 
 ## Handoff
-Pass the plan file to `implementor-amlog` (frontend-dev) to begin coding.
+Pass the plan file to `implementor-amlog` (fe) to begin coding.

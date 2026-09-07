@@ -15,11 +15,11 @@
       "path": "agents/ba/story-writer-amlog"
     },
     {
-      "name": "github-ba-manager-amlog",
+      "name": "github-manager-ba-amlog",
       "type": "ba",
       "stage": "ba",
       "description": "Owns card creation and board sync.",
-      "path": "agents/ba/github-ba-manager-amlog"
+      "path": "agents/ba/github-manager-ba-amlog"
     },
     {
       "name": "github-manager-amlog",
@@ -58,45 +58,45 @@
     },
     {
       "name": "planner-amlog",
-      "type": "frontend-dev",
+      "type": "fe",
       "stage": "planning",
       "description": "Breaks the spec into a front-end implementation plan using codegraph_explore.",
-      "path": "agents/frontend-dev/planner-amlog"
+      "path": "agents/fe/planner-amlog"
     },
     {
       "name": "implementor-amlog",
-      "type": "frontend-dev",
+      "type": "fe",
       "stage": "build",
       "description": "Implements the planned Angular front-end changes.",
-      "path": "agents/frontend-dev/implementor-amlog"
+      "path": "agents/fe/implementor-amlog"
     },
     {
       "name": "browser-launcher-amlog",
-      "type": "frontend-dev",
+      "type": "fe",
       "stage": "build",
       "description": "Starts the dev server, opens a browser, and walks the AC checklist live.",
-      "path": "agents/frontend-dev/browser-launcher-amlog"
+      "path": "agents/fe/browser-launcher-amlog"
     },
     {
       "name": "planner-amlog",
-      "type": "backend-dev",
+      "type": "be",
       "stage": "planning",
       "description": "Breaks the spec into a back-end implementation plan using codegraph_explore.",
-      "path": "agents/backend-dev/planner-amlog"
+      "path": "agents/be/planner-amlog"
     },
     {
       "name": "implementor-amlog",
-      "type": "backend-dev",
+      "type": "be",
       "stage": "build",
       "description": "Implements the planned .NET back-end changes.",
-      "path": "agents/backend-dev/implementor-amlog"
+      "path": "agents/be/implementor-amlog"
     },
     {
       "name": "test-runner-amlog",
-      "type": "backend-dev",
+      "type": "be",
       "stage": "build",
       "description": "Runs codegraph affected + the impacted test suite before hand-off.",
-      "path": "agents/backend-dev/test-runner-amlog"
+      "path": "agents/be/test-runner-amlog"
     },
     {
       "name": "test-generator-amlog",

@@ -1,6 +1,6 @@
 ---
 name: test-runner-amlog
-type: backend-dev
+type: be
 stage: build
 description: Runs codegraph affected + the impacted test suite before hand-off.
 tools: [read, bash, codegraph_explore]
