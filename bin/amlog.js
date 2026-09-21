@@ -20,7 +20,7 @@ program
   .option('--all', 'Install all agents')
   .option('--target <types>', 'Comma-separated agent types (e.g. fe,qa)')
   .option('--claude', 'Install native Claude Code subagents (.claude/agents/)')
-  .option('--antigravity', 'Install native Antigravity subagents (.agents/agents/)')
+  .option('--antigravity', 'Install native Antigravity subagents (agents/agents/<name>/AGENT.md)')
   .option('--codex', 'Install native Codex subagents (.codex/agents/)')
   .option('--opencode', 'Install native OpenCode subagents (.opencode/agent/)')
   .option('--tools <ids>', 'Comma-separated tool ids (e.g. claude,codex)')

@@ -8,6 +8,7 @@ const { getAdapter } = require('./adapters');
 const { mergeState, readState, writeState } = require('./state');
 
 const REGISTRY_DIR = path.join(__dirname, '../../registry');
+const SKILLS_DIR = path.join(REGISTRY_DIR, 'skills');
 
 /**
  * Resolve the native filename (without extension) for an agent, suffixing
@@ -35,6 +36,23 @@ async function copyScripts(agent, workspaceDir) {
   if (!fs.existsSync(scriptsSrc)) return;
   const scriptsDest = path.join(workspaceDir, '.amlog', 'scripts', agent.name);
   await fs.copy(scriptsSrc, scriptsDest, { overwrite: true });
+}
+
+/**
+ * Copy any skill(s) an agent declares (`skills:` frontmatter) into
+ * `.amlog/skills/<skill-id>/`, shared across every agent that references it.
+ *
+ * @param {string[]|undefined} skillIds
+ * @param {string} workspaceDir
+ */
+async function copySkills(skillIds, workspaceDir) {
+  if (!Array.isArray(skillIds)) return;
+  for (const skillId of skillIds) {
+    const skillSrc = path.join(SKILLS_DIR, skillId);
+    if (!fs.existsSync(skillSrc)) continue;
+    const skillDest = path.join(workspaceDir, '.amlog', 'skills', skillId);
+    await fs.copy(skillSrc, skillDest, { overwrite: true });
+  }
 }
 
 /**
@@ -74,6 +92,7 @@ async function installAgents(agents, tools, workspaceDir, allAgents = agents) {
         const adapter = getAdapter(toolId);
         const dest = await adapter.write(fileBase, meta, body, workspaceDir);
         await copyScripts(agent, workspaceDir);
+        await copySkills(meta.skills, workspaceDir);
         results.push({ agent, tool: toolId, dest, ok: true });
         stateRecords.push({ tool: toolId, type: agent.type, name: agent.name, fileBase });
       } catch (err) {

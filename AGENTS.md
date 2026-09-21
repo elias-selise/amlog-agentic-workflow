@@ -11,8 +11,11 @@ One package, `amlog-workflow`, installable with a single command, that:
 2. Installs the agentic SDLC agent roster (Business Analyst, front-end dev,
    back-end dev, QA) into the workspace — but only the agents relevant to
    whoever is running the install, selected by `type`.
-3. Ships each agent as a self-contained unit: an agent definition (the
-   "skill") plus whatever scripts that agent actually needs to do its job.
+3. Ships each agent as a self-contained unit: an agent definition (its
+   `agent.md`) plus whatever scripts that agent actually needs to do its job,
+   and — where the agent's logic is framework/language-specific — a
+   reference to a reusable `skill` module (Section 8) it loads at runtime
+   instead of hardcoding that knowledge.
 
 This mirrors two things already decided:
 - The **Platform Hub** install pattern (`amlog-workflow install frontend` /
@@ -210,7 +213,7 @@ one.
 | `planner-amlog` | `be` | planning | — | Breaks spec into a back-end implementation plan, using `codegraph_explore` |
 | `implementor-amlog` | `fe` | build | — | Implements the planned Angular changes |
 | `implementor-amlog` | `be` | build | — | Implements the planned .NET changes (same name, different type — see note above) |
-| `browser-launcher-amlog` | `fe` | build | ✅ `launch-browser.sh` | Starts the dev server, opens a browser, walks the AC checklist live |
+| `browser-launcher-amlog` | `fe` | build | uses `webapp-testing` skill | Drives a headless Playwright browser against the running app to verify the AC checklist |
 | `test-runner-amlog` | `be` | build | ✅ `run-affected-tests.sh` | Runs `codegraph affected` + the impacted test suite before hand-off |
 | `security-review-amlog` | `dev` | build | — | Scans the diff for injection risks, secrets, unsafe input handling |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | Triggers SonarQube scan, enforces the quality gate |
@@ -241,6 +244,7 @@ type: fe
 stage: build
 description: One sentence, third person, describing what this agent does.
 tools: [read, write, edit, bash, codegraph_explore]
+skills: [angular]
 ---
 
 # <Title>
@@ -258,6 +262,26 @@ Which agent this one passes work to next.
 If the agent has a `scripts/` folder, reference the script by relative
 path in its Instructions section (e.g. `Run scripts/launch-browser.sh`),
 don't inline the script logic into the markdown.
+
+`skills` is optional and lists the id(s) of any `registry/skills/<id>/SKILL.md`
+module the agent should load. A skill holds framework/language-specific (or
+process-specific) knowledge — e.g. Angular vs. .NET conventions — factored
+out of the agent.md itself so the same agent stays generic and reusable
+across stacks; the installer copies each referenced skill's folder into
+`.amlog/skills/<id>/` (once per workspace, shared across every agent that
+references it), and the agent's Instructions should explicitly say to read
+it (e.g. "Read `.amlog/skills/angular/SKILL.md` and apply its guidance").
+Skills ship as plain markdown the agent reads at runtime — not a native
+per-tool mechanism — so they work identically across every installed tool
+(Claude Code, Codex, OpenCode, Antigravity).
+
+Skills are self-maintaining, not static: an agent that loads a skill checks
+it against what it actually observes in the codebase (via
+`codegraph_explore`) *before* applying its guidance, and updates the skill
+file in place — additively/correctively, never a full rewrite — if the
+codebase has drifted from what's written. This keeps `.amlog/skills/<id>/`
+current with the real codebase pattern instead of going stale the moment
+the team's conventions change.
 
 ---
 
@@ -289,6 +313,10 @@ amlog-workflow/
 │   │   ├── agent.md
 │   │   └── scripts/
 │   │       └── setup-knowledge-base.sh
+│   ├── skills/                    # reusable framework/language/tool knowledge, referenced via `skills:` frontmatter
+│   │   ├── angular/SKILL.md
+│   │   ├── dotnet/SKILL.md
+│   │   └── webapp-testing/SKILL.md (+ scripts/with_server.py, examples/*.py — adapted from anthropics/skills, Apache-2.0)
 │   └── agents/
 │       ├── ba/
 │       │   ├── story-writer-amlog/agent.md
@@ -303,7 +331,7 @@ amlog-workflow/
 │       ├── fe/
 │       │   ├── planner-amlog/agent.md
 │       │   ├── implementor-amlog/agent.md
-│       │   └── browser-launcher-amlog/agent.md + scripts/launch-browser.sh
+│       │   └── browser-launcher-amlog/agent.md (uses the `webapp-testing` skill, no own scripts/)
 │       ├── be/
 │       │   ├── planner-amlog/agent.md
 │       │   ├── implementor-amlog/agent.md

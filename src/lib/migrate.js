@@ -11,20 +11,24 @@ const INSTRUCTION_FILES = ['AGENTS.md', 'CLAUDE.md', 'GEMINI.md', 'CURSOR.md'];
 /**
  * Detect whether this workspace has a pre-native-tool amlog install: the old
  * `.amlog/agents/<type>/<name>/` tree, and/or an amlog-managed section in one
- * of the instruction files.
+ * of the instruction files. Also detects the old flat Antigravity layout
+ * (`.agents/agents/<name>.md`), superseded by `agents/agents/<name>/AGENT.md`.
  *
  * @param {string} workspaceDir
- * @returns {{ legacyAgentsDir: string|null, instructionFiles: string[] }}
+ * @returns {{ legacyAgentsDir: string|null, legacyAntigravityDir: string|null, instructionFiles: string[] }}
  */
 function detectLegacyInstall(workspaceDir) {
   const legacyDir = path.join(workspaceDir, '.amlog', 'agents');
   const legacyAgentsDir = fs.existsSync(legacyDir) ? legacyDir : null;
 
+  const legacyAntigravity = path.join(workspaceDir, '.agents', 'agents');
+  const legacyAntigravityDir = fs.existsSync(legacyAntigravity) ? legacyAntigravity : null;
+
   const instructionFiles = INSTRUCTION_FILES
     .map((name) => path.join(workspaceDir, name))
     .filter((p) => fs.existsSync(p) && fs.readFileSync(p, 'utf8').includes('<!-- amlog:start -->'));
 
-  return { legacyAgentsDir, instructionFiles };
+  return { legacyAgentsDir, legacyAntigravityDir, instructionFiles };
 }
 
 /**
@@ -36,13 +40,14 @@ function detectLegacyInstall(workspaceDir) {
  * @param {{ yes?: boolean }} opts
  */
 async function runMigration(workspaceDir, opts = {}) {
-  const { legacyAgentsDir, instructionFiles } = detectLegacyInstall(workspaceDir);
-  if (!legacyAgentsDir && instructionFiles.length === 0) return;
+  const { legacyAgentsDir, legacyAntigravityDir, instructionFiles } = detectLegacyInstall(workspaceDir);
+  if (!legacyAgentsDir && !legacyAntigravityDir && instructionFiles.length === 0) return;
 
   console.log(chalk.bold.cyan('\n🧹 Migrating legacy amlog install\n'));
   console.log(chalk.gray('  Agents used to live under .amlog/agents/ — they now install directly'));
   console.log(chalk.gray('  into each AI tool\'s native folder. This will remove:\n'));
   if (legacyAgentsDir) console.log(chalk.gray('    - .amlog/agents/ (old agent definitions)'));
+  if (legacyAntigravityDir) console.log(chalk.gray('    - .agents/agents/ (old flat Antigravity layout, superseded by agents/agents/<name>/AGENT.md)'));
   for (const f of instructionFiles) {
     console.log(chalk.gray(`    - the amlog-managed section in ${path.relative(workspaceDir, f)}`));
   }
@@ -63,6 +68,10 @@ async function runMigration(workspaceDir, opts = {}) {
   if (legacyAgentsDir) {
     await fs.remove(legacyAgentsDir);
     console.log(chalk.green('  ✓ Removed .amlog/agents/'));
+  }
+  if (legacyAntigravityDir) {
+    await fs.remove(legacyAntigravityDir);
+    console.log(chalk.green('  ✓ Removed .agents/agents/ (old flat Antigravity layout)'));
   }
   for (const f of instructionFiles) {
     stripAmlogSection(f);

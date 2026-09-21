@@ -20,6 +20,7 @@ async function write(fileBase, meta, body, workspaceDir) {
     name: fileBase,
     description: meta.description,
     ...(meta.tools ? { tools: meta.tools } : {}),
+    ...(meta.skills ? { skills: meta.skills } : {}),
   };
   const dest = filePath(workspaceDir, fileBase);
   await fs.outputFile(dest, stringifyFrontmatter(frontmatter, body), 'utf8');

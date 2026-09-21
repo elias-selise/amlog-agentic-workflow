@@ -22,4 +22,4 @@ Perform an automated security pre-review on every diff before a PR is opened, ca
 8. If there are BLOCK items, fail with a non-zero exit and list them prominently.
 
 ## Handoff
-If all items pass or warn-only, hand off to `review-amlog` for the full pre-review pass.
+If all items pass or warn-only, hand off to `code-quality-amlog` for the SonarQube quality gate. If there are BLOCK items, return to the implementor (`implementor-amlog` fe or be) for remediation.
