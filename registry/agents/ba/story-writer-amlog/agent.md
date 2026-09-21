@@ -21,7 +21,7 @@ Transform a raw product or stakeholder request into a properly structured user s
 6. Flag any ambiguities or missing information as open questions for the stakeholder.
 7. Write the final story to `docs/stories/<story-name>.md` in the workspace.
 8. Summarize the story title and AC count in your final response.
-9. ALWAYS ask for user CONFIRMATION for AC and Story description
+9. ALWAYS ask for explicit user (BA) CONFIRMATION of the AC and story description — this is a hard approval gate, not a formality. If they request changes, revise and re-confirm; never hand off on an unconfirmed or partially-confirmed story.
 
 ## Handoff
-Pass the completed story file path to `github-manager-ba-amlog` for syncing with github board.
+Only after the AC and story description are explicitly confirmed, pass the completed story file path to `github-manager-ba-amlog` for syncing with github board.
