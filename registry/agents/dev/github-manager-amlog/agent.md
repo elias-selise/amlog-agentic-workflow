@@ -22,10 +22,10 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
 - **Trigger**: When I prompt with phrases like `we will work with <issue-number> issue` or `let's work with <issue-number>`:
     - First, fetch the details of that specific issue/user story to understand the context.
     - Ask the user for the **module name** and any **sprint number** (if not already known) to formulate the branch name.
-    - Ask for the **technical details of the user story** :
-      - create a file for technical instructions under `@docs/<issue-number>/instructions.md`.
-      - And populate the issue description at the top
-      - Then Ask user to write technical details for that issue
+    - **ALWAYS create `docs/<issue-number>/instructions.md`** for developer involvement — this file is never skipped, even if the issue already looks fully specified or the user is brief:
+      - Populate the issue description at the top.
+      - Ask the user to write (or confirm) the technical details for that issue, and add whatever they give you.
+      - If the user has nothing to add right now, still create the file with the issue description alone and note that technical details are pending — do not proceed to branch creation without the file existing.
     - Create a new branch based on the naming rules below.
 - **Branch Naming**:
     - You MUST fetch the issue details from GitHub to get its title.
@@ -50,6 +50,24 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
 - Use the GitHub MCP tool to create the PR, with a PR title/summary based on the commits in the branch.
 - Confirm the target and source branch with me before creating, unless I've already made it explicit.
 - Link the UserStory with the PR.
+- **After the PR is created**, post the implementation plan on the originating issue/card:
+    1. Read `docs/<issue-number>/plan.md` (written earlier by `planner-amlog`).
+    2. Post its contents as a comment on issue `<issue-number>`, prefixed with a `## Implementation Plan` header, via the GitHub MCP tool used elsewhere in this workflow for issue operations.
+    3. If the MCP tool is unavailable, fall back to: `gh issue comment <issue-number> --body-file docs/<issue-number>/plan.md`.
+    4. If `docs/<issue-number>/plan.md` doesn't exist, skip silently and note it in your summary — do not fail PR creation over a missing plan file.
+    5. Only post once per issue per session (avoid duplicate comments on retries).
+
+### Capturing QA/Review Corrections
+- After PR creation (same flow as above), determine which stack(s) issue `<issue-number>` touched: run `git diff --name-only` against the `zones` paths in `amlog-workflow.config.json` if present, otherwise ask me which stack(s) — `fe`, `be`, or both.
+- Check `test-executor-amlog`'s verdict for this cycle:
+  - **`rejected`** or **`accepted-with-open-items`** — for each stack touched, append a correction entry to **both** `.amlog/history/planner-amlog--<type>.md` and `.amlog/history/implementor-amlog--<type>.md`, summarizing what QA/security-review flagged (a hard failure, a flaky suite, a coverage regression, missing security tests) or what security-review feedback required rework:
+    ```
+    ## Issue <issue-number> — <date> (correction — <verdict>)
+    - What actually happened / changed: <what QA/security-review flagged>
+    - Codebase pattern learned: <1-2 bullets>
+    - Lesson for next run: <one imperative sentence>
+    ```
+  - **`accepted`** with no security-review feedback — skip this step; don't write empty/no-op entries.
 
 ## Handoff
 After PR is merged, hand off to `kb-curator-amlog` if knowledge entries were proposed during this cycle.

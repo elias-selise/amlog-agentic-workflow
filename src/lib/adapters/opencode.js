@@ -23,6 +23,7 @@ async function write(fileBase, meta, body, workspaceDir) {
     description: meta.description,
     mode: 'subagent',
     ...(tools ? { tools } : {}),
+    ...(meta.skills ? { skills: meta.skills } : {}),
   };
   const dest = filePath(workspaceDir, fileBase);
   await fs.outputFile(dest, stringifyFrontmatter(frontmatter, body), 'utf8');

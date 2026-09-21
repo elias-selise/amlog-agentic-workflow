@@ -67,14 +67,14 @@
       "name": "implementor-amlog",
       "type": "fe",
       "stage": "build",
-      "description": "Implements the planned Angular front-end changes.",
+      "description": "Implements the planned front-end changes.",
       "path": "agents/fe/implementor-amlog"
     },
     {
       "name": "browser-launcher-amlog",
       "type": "fe",
       "stage": "build",
-      "description": "Starts the dev server, opens a browser, and walks the AC checklist live.",
+      "description": "Drives a headless browser against the running app to verify the AC checklist.",
       "path": "agents/fe/browser-launcher-amlog"
     },
     {
@@ -88,7 +88,7 @@
       "name": "implementor-amlog",
       "type": "be",
       "stage": "build",
-      "description": "Implements the planned .NET back-end changes.",
+      "description": "Implements the planned back-end changes.",
       "path": "agents/be/implementor-amlog"
     },
     {
@@ -109,7 +109,7 @@
       "name": "test-executor-amlog",
       "type": "qa",
       "stage": "qa",
-      "description": "Runs the full test suite and reports pass/fail results.",
+      "description": "Runs the full test suite and reports a verdict that gates PR merge approval.",
       "path": "agents/qa/test-executor-amlog"
     }
   ]
