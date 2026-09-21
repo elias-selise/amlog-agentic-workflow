@@ -394,6 +394,13 @@ A **skill** is reusable knowledge factored out of individual agents so the same 
 
 This is not a linear pipeline. Every build-stage gate can bounce work back to an implementor, and dev-side self-verification (browser/test-runner → security → quality → review) runs as a track parallel to QA (test-generator → test-executor) — both converge on `github-manager-amlog` before merge. `github-manager-amlog` itself appears twice below because it's invoked at two different points in the cycle (kicking off work, and again at PR time) — it's one agent, not two.
 
+![Agent flow: the full cycle](docs/images/agent-flow-full-cycle.png)
+
+> The image above is a static render for viewers that don't support Mermaid (npmjs.com's package preview, some IDEs/editors). On GitHub, expand the block below to see and edit the live Mermaid source it was generated from — if you change the flow, regenerate the PNG from it (`npx @mermaid-js/mermaid-cli -i <source>.mmd -o docs/images/agent-flow-full-cycle.png -b white -w 1600`) so the two stay in sync.
+
+<details>
+<summary>Mermaid source</summary>
+
 ```mermaid
 flowchart TD
     SW["story-writer-amlog<br/>(BA writes story + AC)"]
@@ -470,6 +477,8 @@ flowchart TD
     classDef gate fill:#fff3cd,stroke:#d97757,color:#333;
     class G1,G2,G3 gate;
 ```
+
+</details>
 
 The three diamonds (`G1`, `G2`, `G3`) are the hard human-in-the-loop stops — see the next section. `kb-curator-amlog` is drawn dashed-in-concept because it's documented in [`AGENTS.md`](AGENTS.md) as part of the intended roster but isn't built yet; the handoff to it is a forward reference.
 
