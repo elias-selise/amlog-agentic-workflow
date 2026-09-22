@@ -6,7 +6,7 @@ const semver = require('semver');
 const { filterAgents, loadManifest } = require('../lib/manifest');
 const { installAgents, getInstalledTypes, getInstalledTools } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
-const { isCodegraphInstalled, syncZones, wireCodegraph } = require('../lib/knowledge-base');
+const { isCodegraphInstalled, syncZones, wireCodegraph, refreshWindowsPath } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
 const { runUpgrade, getLatestVersion } = require('./upgrade');
@@ -78,6 +78,7 @@ async function runUpdate(opts) {
 
   // Re-index zones so changes to amlog-workflow.config.json (e.g. a newly added
   // zone) take effect without a full uninstall/reinstall.
+  refreshWindowsPath();
   if (isCodegraphInstalled()) {
     console.log(chalk.bold.cyan('\n📚 Syncing knowledge base zones...\n'));
     syncZones(WORKSPACE);
