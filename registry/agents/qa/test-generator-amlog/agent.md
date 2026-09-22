@@ -23,4 +23,7 @@ Analyse the implementation and its existing tests to identify and write edge-cas
 9. Report how many new test cases were added (noting which came from the tester vs. autonomous generation), which edge cases (including security categories) they cover, and any flaky-suspect tests.
 
 ## Handoff
-Pass the updated test files to `test-executor-amlog` to run the full suite.
+- **Edge-case tests written and tester input incorporated (step 4):** → `test-executor-amlog` (`qa`) — run the full suite including the new tests.
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+`NEXT AGENT: test-executor-amlog (qa) — run full suite for issue <issue-number>`

@@ -32,4 +32,8 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
    If the file would then have more than 20 entries, first condense entries older than the most recent 20 into a single `## Archived lessons (condensed)` bullet list at the top (dedupe repeated lessons), then write the file back. If the same lesson recurs in 3+ entries, propose adding it as a bullet to `.amlog/skills/dotnet/SKILL.md` — surface this to the user for confirmation; do not edit the skill file automatically.
 
 ## Handoff
-Only after the developer has confirmed the plan, pass the plan file to `implementor-amlog` (be) to begin coding.
+- **Developer has confirmed the plan (step 8):** → `implementor-amlog` (`be`) — begin coding from `docs/<issue-number>/plan.md`.
+- **Developer requests changes:** stay in this agent, revise, and re-confirm — never hand off on an unreviewed plan.
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+`NEXT AGENT: implementor-amlog (be) — implement confirmed plan docs/<issue-number>/plan.md`

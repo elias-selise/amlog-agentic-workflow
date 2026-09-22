@@ -22,4 +22,7 @@ Provide research support to planning agents by investigating third-party librari
 8. Write the research summary to `docs/<issue-number>/research.md`.
 
 ## Handoff
-Pass the research doc path to `planner-amlog` (frontend or backend) to inform the implementation plan.
+- **Research complete:** → `planner-amlog` (`fe` or `be` — whichever planner invoked this research) — return with `docs/<issue-number>/research.md` to inform the plan.
+
+This agent is only reached when a planner explicitly asks for it (currently: `planner-amlog` (fe) step 10) — it never initiates on its own. Hand off the moment research is written — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+`NEXT AGENT: planner-amlog (fe|be) — research complete for issue <issue-number>, see docs/<issue-number>/research.md`

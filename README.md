@@ -376,6 +376,14 @@ agy --agent implementor-amlog "..."
 
 Any companion shell script an agent ships with (e.g. `run-test-suite.sh`) is copied to `.amlog/scripts/<agent-name>/` once per workspace, and every native agent file references it there — regardless of which tool(s) you installed for.
 
+**Handoffs are explicit, not inferred.** Every agent's `## Handoff` section lists the exact next agent(s) per condition, and asks the model to act on it immediately rather than just describing it. Claude Code and OpenCode can invoke a project subagent directly, so on those tools the handoff usually just happens. Codex doesn't auto-chain subagents the same way — today, moving from one Codex agent to the next depends on a human (or the parent session) noticing the handoff and re-invoking (`codex "spawn implementor-amlog to build this"`). To make that impossible to miss, every agent ends its final message with a line like:
+
+```
+NEXT AGENT: implementor-amlog (fe) — implement confirmed plan docs/42/plan.md
+```
+
+If your tool doesn't auto-chain, watch for that line and act on it — that's the signal a handoff didn't happen automatically.
+
 ---
 
 ## Skills

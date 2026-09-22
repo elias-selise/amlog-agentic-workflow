@@ -26,4 +26,9 @@ Start the front-end development server and drive it with a headless Playwright b
 9. Report the full AC checklist result: PASS/FAIL per item, screenshot paths, and any console errors observed.
 
 ## Handoff
-On full AC pass, hand off to `security-review-amlog`. On any fail, return to `implementor-amlog` with the failure notes.
+- **Full AC pass:** → `security-review-amlog` (`dev`) — proceed to the security pre-review.
+- **Any AC fail:** → `implementor-amlog` (`fe`) — return with the failure notes, exact UI state, and screenshot paths as evidence.
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: security-review-amlog (dev) — AC checklist passed for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (fe) — AC checklist failed for issue <issue-number>, see failure notes above`

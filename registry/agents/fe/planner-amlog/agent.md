@@ -34,4 +34,10 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
    If the file would then have more than 20 entries, first condense entries older than the most recent 20 into a single `## Archived lessons (condensed)` bullet list at the top (dedupe repeated lessons), then write the file back. If the same lesson recurs in 3+ entries, propose adding it as a bullet to the selected skill's `SKILL.md` — surface this to the user for confirmation; do not edit the skill file automatically.
 
 ## Handoff
-Only after the developer has confirmed the plan, pass the plan file to `implementor-amlog` (fe) to begin coding.
+- **Developer requests further research (step 10):** → `researcher-amlog` (`dev`) — investigate the open question(s) against `docs/<issue-number>/plan.md`, then return here to fold the findings back into the plan.
+- **Developer has confirmed the plan (step 9):** → `implementor-amlog` (`fe`) — begin coding from `docs/<issue-number>/plan.md`.
+- **Developer requests changes:** stay in this agent, revise, and re-confirm — never hand off on an unreviewed plan.
+
+Hand off the moment a condition above is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: researcher-amlog (dev) — research open question(s) for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (fe) — implement confirmed plan docs/<issue-number>/plan.md`

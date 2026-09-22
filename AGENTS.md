@@ -259,6 +259,36 @@ skills: [angular]
 Which agent this one passes work to next.
 ```
 
+**Handoff format is standardized, not free prose** — every agent's `## Handoff`
+section follows this shape:
+
+```markdown
+## Handoff
+- **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
+- **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
+
+Hand off the moment a condition above is met — don't wait to be re-prompted,
+and don't just narrate the handoff. If your tool can invoke another
+agent/subagent directly, do that now. If it can't, end your final message
+with one line per handoff, exactly as shown, so the next step is never left
+implicit:
+`NEXT AGENT: <next-agent-name> (<type>) — <reason>`
+```
+
+This exists because not every tool auto-chains agents the same way: Claude
+Code and OpenCode can invoke a project subagent directly, but Codex's
+handoff today depends on a human (or the parent session) noticing free-form
+prose and re-invoking it — if the wording is vague, the handoff silently
+never happens. The `NEXT AGENT: ...` sentinel line gives every tool
+(including ones that can't invoke a subagent themselves) something
+unambiguous to act on instead of losing the thread. Only name the
+*immediate* next agent per condition — never describe a multi-hop chain
+("...then X, then once X passes, Y takes over") inside one agent's Handoff
+section; each downstream agent already owns describing its own next hop,
+and a stale multi-hop description drifts out of sync with reality (this bit
+the front-end/back-end `implementor-amlog` agents in practice — fixed
+alongside this convention).
+
 If the agent has a `scripts/` folder, reference the script by relative
 path in its Instructions section (e.g. `Run scripts/launch-browser.sh`),
 don't inline the script logic into the markdown.

@@ -22,4 +22,9 @@ Use CodeGraph's impact analysis to identify which tests are affected by the curr
 8. Exit non-zero if any test failed.
 
 ## Handoff
-On full test pass, hand off to `security-review-amlog`. On failure, return to `implementor-amlog` with the failing test details.
+- **All affected tests pass:** → `security-review-amlog` (`dev`) — proceed to the security pre-review.
+- **Any affected test fails:** → `implementor-amlog` (`be`) — return with the failing test name(s) and failure message(s).
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: security-review-amlog (dev) — affected tests passed for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (be) — affected tests failed for issue <issue-number>, see failure details above`

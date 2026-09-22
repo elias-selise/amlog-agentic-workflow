@@ -30,4 +30,9 @@ Execute the back-end implementation plan, writing production-quality code that p
    If the file would then have more than 20 entries, first condense entries older than the most recent 20 into a single `## Archived lessons (condensed)` bullet list at the top (dedupe repeated lessons), then write the file back. If the same lesson recurs in 3+ entries, propose adding it as a bullet to `.amlog/skills/dotnet/SKILL.md` — surface this to the user for confirmation; do not edit the skill file automatically.
 
 ## Handoff
-After successful build and test, hand off to `test-runner-amlog` to run affected tests, then to `security-review-amlog`. Once security review passes, `github-manager-amlog` takes over for commit/PR creation — which now also posts the implementation plan (`docs/<issue-number>/plan.md`) as a comment on the originating issue.
+- **Build and test pass:** → `test-runner-amlog` (`be`) — run the codegraph-affected test suite.
+- **In parallel, same trigger (build and test pass):** → `test-generator-amlog` (`qa`) — write edge-case tests for the QA track, independent of the dev-side verification track above.
+
+These are two independent tracks off the same trigger, not a chain — `test-runner-amlog` continues on to `security-review-amlog` itself; it does not hand back through this agent. Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now (invoke both). If it can't, end your final message with both lines so neither is left implicit:
+`NEXT AGENT: test-runner-amlog (be) — run affected tests for issue <issue-number>`
+`NEXT AGENT: test-generator-amlog (qa) — write edge-case tests for issue <issue-number>`

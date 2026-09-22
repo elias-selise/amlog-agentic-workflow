@@ -23,4 +23,9 @@ Run an automated pre-review pass on the diff — verifying the implementation ag
 9. Findout any solution is look like Patch solution or not. Patch solution is risker. Ask to come up with better alternative solution.
 
 ## Handoff
-On APPROVE, hand off to `github-manager-amlog` to open or promote the PR. On REQUEST CHANGES, return findings to the implementor.
+- **Verdict APPROVE:** → `github-manager-amlog` (`dev`) — open or promote the PR.
+- **Verdict REQUEST CHANGES:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the diff touches) — return with the uncovered AC and convention issues from the review report.
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: github-manager-amlog (dev) — review APPROVEd for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (fe|be) — review REQUEST CHANGES for issue <issue-number>, see report above`

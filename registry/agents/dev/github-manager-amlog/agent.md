@@ -70,4 +70,10 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
   - **`accepted`** with no security-review feedback — skip this step; don't write empty/no-op entries.
 
 ## Handoff
-After PR is merged, hand off to `kb-curator-amlog` if knowledge entries were proposed during this cycle.
+- **After creating the branch + `docs/<issue-number>/instructions.md` (start-of-work trigger):** → `planner-amlog` (`fe` and/or `be`, matching whichever codebase(s) the issue touches) — begin planning from `docs/<issue-number>/instructions.md`.
+- **After the PR is merged (PR-time trigger), and knowledge entries were proposed during this cycle:** → `kb-curator-amlog` (`dev`) — not yet built (see README's roster note); until it exists, name it explicitly in your summary as the pending next step instead of silently dropping it.
+- **After the PR is merged, and no knowledge entries were proposed:** this ends the cycle — no further handoff.
+
+Hand off the moment a condition above is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: planner-amlog (fe|be) — plan issue <issue-number> from docs/<issue-number>/instructions.md`
+`NEXT AGENT: kb-curator-amlog (dev) — curate pending knowledge entries from issue <issue-number>` (only once `kb-curator-amlog` is built and installed)
