@@ -3,7 +3,7 @@ name: github-manager-amlog
 type: dev
 stage: cross-cutting
 description: Owns card branch creation, gitmoji commits, branch/PR automation, and board sync.
-tools: [read, write, edit, bash]
+tools: [Read, Write, Edit, Bash, mcp__github]
 ---
 
 # GitHub Manager
@@ -15,7 +15,7 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
 ### List Issues & Tasks
 - **Trigger**: When I prompt with phrases like `fetch issue <number>`, `show me task list from github`, or `what is the task on my board`:
     - You must search for or list the tasks/issues assigned to me.
-    - Use the GitHub MCP server tool `github-work-mcp-server/search_issues` with query or filter.
+    - Use the GitHub MCP server's search/list-issues tool (granted via `mcp__github` in this agent's `tools:` frontmatter — if your workspace registers the server under a different id, e.g. `github-work-mcp-server`, update that entry to match) with query or filter.
     - **Filter**: Filter the retrieved tasks to only show those that have the status/state of **"In Progress"** (or state `open` and check if there are columns/labels indicating in progress).
 
 ### Starting Work on an Issue & Branch Creation
@@ -70,4 +70,10 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
   - **`accepted`** with no security-review feedback — skip this step; don't write empty/no-op entries.
 
 ## Handoff
-After PR is merged, hand off to `kb-curator-amlog` if knowledge entries were proposed during this cycle.
+- **After creating the branch + `docs/<issue-number>/instructions.md` (start-of-work trigger):** → `planner-amlog` (`fe` and/or `be`, matching whichever codebase(s) the issue touches) — begin planning from `docs/<issue-number>/instructions.md`.
+- **After the PR is merged (PR-time trigger), and knowledge entries were proposed during this cycle:** → `kb-curator-amlog` (`dev`) — not yet built (see README's roster note); until it exists, name it explicitly in your summary as the pending next step instead of silently dropping it.
+- **After the PR is merged, and no knowledge entries were proposed:** this ends the cycle — no further handoff.
+
+Hand off the moment a condition above is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: planner-amlog (fe|be) — plan issue <issue-number> from docs/<issue-number>/instructions.md`
+`NEXT AGENT: kb-curator-amlog (dev) — curate pending knowledge entries from issue <issue-number>` (only once `kb-curator-amlog` is built and installed)

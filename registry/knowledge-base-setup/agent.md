@@ -3,7 +3,7 @@ name: knowledge-base-setup
 type: dev
 stage: platform
 description: Installs and initializes CodeGraph for the workspace knowledge graph.
-tools: [bash, read]
+tools: [Bash, Read]
 ---
 
 # Knowledge Base Setup
@@ -22,4 +22,6 @@ Ensure CodeGraph is installed, wired into agent CLIs, and all workspace zones ar
 8. Report success or failure for each zone clearly.
 
 ## Handoff
-Once knowledge base is indexed, hand off to `planner-amlog` (frontend or backend) or `researcher-amlog` for planning.
+This is a platform/one-time setup step, not part of the per-issue pipeline (it doesn't appear in the agent-flow diagram in README.md) — it just gets `.codegraph` ready before any other agent runs `codegraph_explore`. There is no automatic next agent: once every zone reports indexed successfully, this session ends. The per-issue cycle starts separately and later, whenever a developer/BA kicks it off (e.g. `story-writer-amlog` for a new story, or `github-manager-amlog` (`dev`) once a developer says "let's work with issue #<n>").
+
+If any zone failed to index, do not claim success — report exactly which zone(s) failed and why, so the failure isn't silently lost.

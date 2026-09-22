@@ -321,8 +321,8 @@ If you don't create this file, `amlog install` will detect a plausible multi-zon
 | `security-review-amlog` | `dev` | build | — | — | — |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | — | — |
 | `review-amlog` | `dev` | build | — | — | — |
-| `planner-amlog` | `fe` | planning | — | `angular` | ✅ Developer must confirm the plan |
-| `implementor-amlog` | `fe` | build | — | `angular` | — |
+| `planner-amlog` | `fe` | planning | — | `angular`, `react` | ✅ Developer must confirm the plan |
+| `implementor-amlog` | `fe` | build | — | `angular`, `react` | — |
 | `browser-launcher-amlog` | `fe` | build | — | `webapp-testing` | — |
 | `planner-amlog` | `be` | planning | — | `dotnet` | ✅ Developer must confirm the plan |
 | `implementor-amlog` | `be` | build | — | `dotnet` | — |
@@ -346,10 +346,12 @@ name: implementor-amlog
 type: fe
 stage: build
 description: Implements the planned front-end changes.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 skills: [angular]
 ---
 ```
+
+> **Tool names must match the target CLI's exact spelling.** For Claude Code, native tools are capitalized (`Read`, `Write`, `Edit`, `Bash`, `WebSearch`, `WebFetch`) — a lowercase `read`/`write`/etc. is silently invisible to the subagent. MCP tools use `mcp__<server-id>__<tool-name>` for one specific tool, or the bare `mcp__<server-id>` to grant every tool a server exposes (used for `mcp__github` on the GitHub-manager agents and `mcp__figma` on the frontend planner/implementor, both of which need many tools from those servers). `<server-id>` must match the id the MCP server is actually registered under in your workspace — adjust it if yours differs from `github`/`figma`.
 
 `amlog install` converts that definition into **each selected tool's own native format and folder** (see the table in [What is amlog?](#what-is-amlog)), so the tool discovers and can invoke it itself — no manual `@`-referencing needed. Exact invocation syntax is each tool's own (check its docs); roughly:
 
@@ -374,6 +376,14 @@ agy --agent implementor-amlog "..."
 
 Any companion shell script an agent ships with (e.g. `run-test-suite.sh`) is copied to `.amlog/scripts/<agent-name>/` once per workspace, and every native agent file references it there — regardless of which tool(s) you installed for.
 
+**Handoffs are explicit, not inferred.** Every agent's `## Handoff` section lists the exact next agent(s) per condition, and asks the model to act on it immediately rather than just describing it. Claude Code and OpenCode can invoke a project subagent directly, so on those tools the handoff usually just happens. Codex doesn't auto-chain subagents the same way — today, moving from one Codex agent to the next depends on a human (or the parent session) noticing the handoff and re-invoking (`codex "spawn implementor-amlog to build this"`). To make that impossible to miss, every agent ends its final message with a line like:
+
+```
+NEXT AGENT: implementor-amlog (fe) — implement confirmed plan docs/42/plan.md
+```
+
+If your tool doesn't auto-chain, watch for that line and act on it — that's the signal a handoff didn't happen automatically.
+
 ---
 
 ## Skills
@@ -383,10 +393,13 @@ A **skill** is reusable knowledge factored out of individual agents so the same 
 | Skill | Used by | What it covers |
 |---|---|---|
 | `angular` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/module structure, API data flow, NgRx/signals state, naming/barrel conventions, `ng build`/`ng lint` verification |
+| `react` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/hook structure, API data flow via existing data-fetching layer, Redux/Zustand/Context state, naming/folder conventions, build/lint/test verification |
 | `dotnet` | `planner-amlog` (be), `implementor-amlog` (be) | Layered architecture (Controllers/Services/Repositories/DTOs), API contract, FluentValidation, `dotnet build`/`dotnet test` verification |
 | `webapp-testing` | `browser-launcher-amlog` (fe) | Playwright-driven headless browser verification — adapted from Anthropic's official `webapp-testing` skill (Apache-2.0; see `registry/skills/webapp-testing/THIRD_PARTY_NOTICE.md`) |
 
-**Skills are self-updating, not static.** Before applying a skill's guidance, `planner-amlog`/`implementor-amlog` check what they actually observe in the codebase (via `codegraph_explore`) against what the skill file says, and correct the skill file in place — additively, never a full rewrite — when the team's conventions have drifted. A skill stays current without anyone having to maintain it by hand.
+Both `angular` and `react` are installed for every `fe` agent, but only one is *applied* per run: `planner-amlog`/`implementor-amlog` detect the target codebase's framework (via `package.json` dependencies or file extensions) and load the matching skill, so the same agent works unmodified against either stack.
+
+**Skills are self-updating, not static.** Before applying a skill's guidance, `planner-amlog`/`implementor-amlog` check what they actually observe in the codebase (via `codegraph_explore`) against what the selected skill file says, and correct that skill file in place — additively, never a full rewrite — when the team's conventions have drifted. A skill stays current without anyone having to maintain it by hand.
 
 ---
 

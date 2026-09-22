@@ -243,7 +243,7 @@ name: implementor-amlog
 type: fe
 stage: build
 description: One sentence, third person, describing what this agent does.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 skills: [angular]
 ---
 
@@ -259,9 +259,55 @@ skills: [angular]
 Which agent this one passes work to next.
 ```
 
+**Handoff format is standardized, not free prose** — every agent's `## Handoff`
+section follows this shape:
+
+```markdown
+## Handoff
+- **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
+- **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
+
+Hand off the moment a condition above is met — don't wait to be re-prompted,
+and don't just narrate the handoff. If your tool can invoke another
+agent/subagent directly, do that now. If it can't, end your final message
+with one line per handoff, exactly as shown, so the next step is never left
+implicit:
+`NEXT AGENT: <next-agent-name> (<type>) — <reason>`
+```
+
+This exists because not every tool auto-chains agents the same way: Claude
+Code and OpenCode can invoke a project subagent directly, but Codex's
+handoff today depends on a human (or the parent session) noticing free-form
+prose and re-invoking it — if the wording is vague, the handoff silently
+never happens. The `NEXT AGENT: ...` sentinel line gives every tool
+(including ones that can't invoke a subagent themselves) something
+unambiguous to act on instead of losing the thread. Only name the
+*immediate* next agent per condition — never describe a multi-hop chain
+("...then X, then once X passes, Y takes over") inside one agent's Handoff
+section; each downstream agent already owns describing its own next hop,
+and a stale multi-hop description drifts out of sync with reality (this bit
+the front-end/back-end `implementor-amlog` agents in practice — fixed
+alongside this convention).
+
 If the agent has a `scripts/` folder, reference the script by relative
 path in its Instructions section (e.g. `Run scripts/launch-browser.sh`),
 don't inline the script logic into the markdown.
+
+`tools` entries must be spelled exactly as the target tool CLI recognizes
+them — for Claude Code specifically, native tools are capitalized
+(`Read`, `Write`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, not their
+lowercase forms), otherwise the subagent silently can't see the tool. MCP
+server tools use the `mcp__<server-id>__<tool-name>` form for a single
+tool (e.g. `mcp__codegraph__codegraph_explore`), or the bare
+`mcp__<server-id>` form to grant every tool a server exposes — use the
+bare form for servers with many tools an agent needs broadly (e.g.
+`mcp__github` for `github-manager-amlog`, `mcp__figma` for the frontend
+`planner-amlog`/`implementor-amlog`). `<server-id>` must match whatever id
+the MCP server is actually registered under in the target workspace (the
+official GitHub/Figma servers are typically `github`/`figma`, but a
+workspace may register a custom-named server instead) — if it's
+installed under a different id, update the agent's `tools:` entry to
+match rather than leaving a dangling grant.
 
 `skills` is optional and lists the id(s) of any `registry/skills/<id>/SKILL.md`
 module the agent should load. A skill holds framework/language-specific (or
@@ -315,6 +361,7 @@ amlog-workflow/
 │   │       └── setup-knowledge-base.sh
 │   ├── skills/                    # reusable framework/language/tool knowledge, referenced via `skills:` frontmatter
 │   │   ├── angular/SKILL.md
+│   │   ├── react/SKILL.md
 │   │   ├── dotnet/SKILL.md
 │   │   └── webapp-testing/SKILL.md (+ scripts/with_server.py, examples/*.py — adapted from anthropics/skills, Apache-2.0)
 │   └── agents/

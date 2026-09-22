@@ -3,7 +3,7 @@ name: code-quality-amlog
 type: dev
 stage: build
 description: Triggers SonarQube scan and enforces the quality gate.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Code Quality
@@ -22,4 +22,9 @@ Trigger a SonarQube static analysis scan on the current diff and enforce the pro
 8. Exit non-zero if the quality gate is ERROR; exit zero if OK or WARN.
 
 ## Handoff
-On gate pass, hand off to `review-amlog`. On gate failure, return to the implementor for remediation.
+- **Quality gate OK (or WARN, non-blocking):** → `review-amlog` (`dev`) — proceed to the pre-review pass.
+- **Quality gate ERROR:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the diff touches) — return with the failing conditions and thresholds.
+
+Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: review-amlog (dev) — quality gate passed for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (fe|be) — quality gate failed for issue <issue-number>, see failing conditions above`

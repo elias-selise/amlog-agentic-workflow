@@ -4,7 +4,7 @@ const os = require('os');
 const path = require('path');
 const chalk = require('chalk');
 const fs = require('fs-extra');
-const { getCodegraphCommand, isCodegraphInstalled, isCodegraphWiredForTool } = require('../lib/knowledge-base');
+const { getCodegraphCommand, isCodegraphInstalled, isCodegraphWiredForTool, refreshWindowsPath } = require('../lib/knowledge-base');
 const { detectAgentInstructionFile } = require('../lib/detect-agent-cli');
 const { getInstalledTools } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
@@ -34,6 +34,7 @@ async function runDoctor() {
   console.log();
 
   console.log(chalk.bold('  CodeGraph:'));
+  refreshWindowsPath();
   const cmd = getCodegraphCommand();
   console.log(chalk.gray(`  Resolved command: ${cmd}`));
   if (isCodegraphInstalled()) {

@@ -3,7 +3,7 @@ name: test-executor-amlog
 type: qa
 stage: qa
 description: Runs the full test suite and reports a verdict that gates PR merge approval.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Test Executor
@@ -27,4 +27,12 @@ Execute the complete test suite across both frontend and backend, producing a de
 10. Exit non-zero only on `rejected`. Both `accepted` and `accepted-with-open-items` exit 0 — an open item is visible, not blocking.
 
 ## Handoff
-On `accepted`, hand off to `github-manager-amlog` to promote the PR to "Ready for Review". On `accepted-with-open-items`, hand off to `github-manager-amlog` the same way, but call out the open items explicitly so they carry into the corrections-capture step — if the only open item is a flaky suite, also loop `test-generator-amlog` in to stabilize it. On `rejected`, return to `test-generator-amlog` or `implementor-amlog` with the failure report.
+- **Verdict `accepted`:** → `github-manager-amlog` (`dev`) — promote the PR to "Ready for Review".
+- **Verdict `accepted-with-open-items`:** → `github-manager-amlog` (`dev`) — same as above, but call out the open items explicitly so they carry into its corrections-capture step. If the only open item is a flaky suite, also hand off to `test-generator-amlog` (`qa`) in parallel to stabilize it.
+- **Verdict `rejected`, hard failure:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the failure is in) — return with the failure report.
+- **Verdict `rejected`, coverage below floor only (no hard failure):** → `test-generator-amlog` (`qa`) — return with the coverage report so more tests can close the gap.
+
+Hand off the moment a verdict is reached — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line(s) so the next step is never left implicit:
+`NEXT AGENT: github-manager-amlog (dev) — QA verdict <accepted|accepted-with-open-items> for issue <issue-number>`
+`NEXT AGENT: test-generator-amlog (qa) — QA verdict rejected (coverage/flaky) for issue <issue-number>`
+`NEXT AGENT: implementor-amlog (fe|be) — QA verdict rejected (hard failure) for issue <issue-number>`

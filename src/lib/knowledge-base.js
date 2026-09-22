@@ -71,6 +71,38 @@ function isCodegraphInstalled() {
 }
 
 /**
+ * On Windows, PATH changes an installer writes to the registry aren't visible
+ * to already-running processes — and often not even to a "new" terminal,
+ * since a window launched from an already-running desktop session inherits
+ * its environment block from explorer.exe rather than re-reading the
+ * registry. Re-read the User+Machine PATH directly and merge it into this
+ * process's env so a CLI installed moments ago (by us or in another window)
+ * is resolvable without requiring a terminal/session restart. Best-effort:
+ * failures just leave PATH as-is.
+ */
+function refreshWindowsPath() {
+  if (process.platform !== 'win32') return;
+  try {
+    const result = spawnSync(
+      'powershell',
+      [
+        '-NoProfile',
+        '-Command',
+        "[Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')",
+      ],
+      { encoding: 'utf8' }
+    );
+    const freshPath = (result.stdout || '').trim();
+    if (result.status === 0 && freshPath) {
+      process.env.PATH = freshPath;
+      cachedCommand = null;
+    }
+  } catch {
+    // best-effort; leave PATH as-is
+  }
+}
+
+/**
  * Describe the install method that will be tried first for this OS, for
  * display to the user before anything actually runs.
  * @returns {string}
@@ -132,6 +164,21 @@ function installCodegraph() {
 }
 
 /**
+ * Print the standard wiring-failure warning, with a Windows-specific hint
+ * since a stale PATH (see refreshWindowsPath) is the most common cause there.
+ */
+function warnWireFailure() {
+  console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
+  if (process.platform === 'win32') {
+    console.log(chalk.yellow(
+      '  This is often a stale PATH on Windows — even a new terminal window can still be missing\n' +
+      '  a PATH entry that was added moments ago. Signing out/in (or restarting Explorer) refreshes\n' +
+      '  it reliably; afterwards, run `amlog update` to retry wiring without repeating agent install.'
+    ));
+  }
+}
+
+/**
  * Check whether CodeGraph's MCP server is already wired into a specific
  * agent CLI's own global config file (e.g. ~/.claude.json for `claude`).
  * Asks CodeGraph itself where that config lives (`--print-config`) instead
@@ -182,7 +229,7 @@ function wireCodegraph(targetTools = []) {
       { stdio: 'inherit' }
     );
     if (result.status !== 0) {
-      console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
+      warnWireFailure();
     }
     return;
   }
@@ -194,7 +241,7 @@ function wireCodegraph(targetTools = []) {
     { stdio: 'inherit' }
   );
   if (result.status !== 0) {
-    console.log(chalk.yellow('  WARNING: failed to wire CodeGraph into agent CLIs.'));
+    warnWireFailure();
   }
 }
 
@@ -314,6 +361,11 @@ function detectPlausibleZones(workspaceDir) {
 async function bootstrapKnowledgeBase(workspaceDir, targetTools = [], opts = {}) {
   console.log(chalk.bold.cyan('\n📚 Bootstrapping knowledge base...\n'));
 
+  // Pick up a PATH entry from a CodeGraph install done in another window/session
+  // earlier — see refreshWindowsPath() for why a plain terminal restart isn't
+  // reliable enough on Windows.
+  refreshWindowsPath();
+
   const cmd = getCodegraphCommand();
 
   // Step 1: Ensure CodeGraph is installed
@@ -336,6 +388,8 @@ async function bootstrapKnowledgeBase(workspaceDir, targetTools = [], opts = {})
       return;
     }
     installCodegraph();
+    // Pick up the PATH entry the installer just wrote, within this same process.
+    refreshWindowsPath();
   }
 
   // Step 2: Wire into agent CLIs (only the tools that aren't already wired)
@@ -362,4 +416,5 @@ module.exports = {
   bootstrapKnowledgeBase,
   getCodegraphCommand,
   detectPlausibleZones,
+  refreshWindowsPath,
 };
