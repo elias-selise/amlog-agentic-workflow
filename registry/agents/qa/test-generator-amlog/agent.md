@@ -3,7 +3,7 @@ name: test-generator-amlog
 type: qa
 stage: qa
 description: Writes edge-case tests the pre-QA gate did not cover.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 ---
 
 # Test Generator

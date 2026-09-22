@@ -243,7 +243,7 @@ name: implementor-amlog
 type: fe
 stage: build
 description: One sentence, third person, describing what this agent does.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 skills: [angular]
 ---
 
@@ -262,6 +262,22 @@ Which agent this one passes work to next.
 If the agent has a `scripts/` folder, reference the script by relative
 path in its Instructions section (e.g. `Run scripts/launch-browser.sh`),
 don't inline the script logic into the markdown.
+
+`tools` entries must be spelled exactly as the target tool CLI recognizes
+them — for Claude Code specifically, native tools are capitalized
+(`Read`, `Write`, `Edit`, `Bash`, `WebSearch`, `WebFetch`, not their
+lowercase forms), otherwise the subagent silently can't see the tool. MCP
+server tools use the `mcp__<server-id>__<tool-name>` form for a single
+tool (e.g. `mcp__codegraph__codegraph_explore`), or the bare
+`mcp__<server-id>` form to grant every tool a server exposes — use the
+bare form for servers with many tools an agent needs broadly (e.g.
+`mcp__github` for `github-manager-amlog`, `mcp__figma` for the frontend
+`planner-amlog`/`implementor-amlog`). `<server-id>` must match whatever id
+the MCP server is actually registered under in the target workspace (the
+official GitHub/Figma servers are typically `github`/`figma`, but a
+workspace may register a custom-named server instead) — if it's
+installed under a different id, update the agent's `tools:` entry to
+match rather than leaving a dangling grant.
 
 `skills` is optional and lists the id(s) of any `registry/skills/<id>/SKILL.md`
 module the agent should load. A skill holds framework/language-specific (or
@@ -315,6 +331,7 @@ amlog-workflow/
 │   │       └── setup-knowledge-base.sh
 │   ├── skills/                    # reusable framework/language/tool knowledge, referenced via `skills:` frontmatter
 │   │   ├── angular/SKILL.md
+│   │   ├── react/SKILL.md
 │   │   ├── dotnet/SKILL.md
 │   │   └── webapp-testing/SKILL.md (+ scripts/with_server.py, examples/*.py — adapted from anthropics/skills, Apache-2.0)
 │   └── agents/

@@ -3,7 +3,7 @@ name: story-writer-amlog
 type: ba
 stage: ba
 description: Turns a raw feature request into a structured story with acceptance criteria.
-tools: [read, write, edit]
+tools: [Read, Write, Edit]
 ---
 
 # Story Writer

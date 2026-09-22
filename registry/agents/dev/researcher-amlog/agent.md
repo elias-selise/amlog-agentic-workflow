@@ -3,7 +3,7 @@ name: researcher-amlog
 type: dev
 stage: planning
 description: Shared research support for libraries, external APIs, and prior art.
-tools: [read, bash, codegraph_explore]
+tools: [Read, Bash, mcp__codegraph__codegraph_explore, WebSearch, WebFetch]
 ---
 
 # Researcher
@@ -14,7 +14,7 @@ Provide research support to planning agents by investigating third-party librari
 ## Instructions
 1. Read the story or planning request to identify what needs to be researched.
 2. Use `codegraph_explore` to find existing implementations or patterns in codebase related to the topic.
-3. Search for established npm packages (for Angular) or NuGet packages (for .NET) that solve the problem.
+3. Use `WebSearch`/`WebFetch` to research established npm packages (for Angular/React) or NuGet packages (for .NET) that solve the problem.
 4. Evaluate at most 3 candidate solutions per problem area: compare license, maintenance activity, bundle size (for frontend), and compatibility.
 5. Look for any existing usage of the same library or pattern already in the codebase to avoid duplication.
 6. Summarize findings as a numbered list with a clear recommendation and rationale for each area.

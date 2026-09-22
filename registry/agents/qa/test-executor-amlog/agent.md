@@ -3,7 +3,7 @@ name: test-executor-amlog
 type: qa
 stage: qa
 description: Runs the full test suite and reports a verdict that gates PR merge approval.
-tools: [read, bash]
+tools: [Read, Bash]
 ---
 
 # Test Executor

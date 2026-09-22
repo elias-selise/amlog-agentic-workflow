@@ -3,7 +3,7 @@ name: github-manager-amlog
 type: dev
 stage: cross-cutting
 description: Owns card branch creation, gitmoji commits, branch/PR automation, and board sync.
-tools: [read, write, edit, bash]
+tools: [Read, Write, Edit, Bash, mcp__github]
 ---
 
 # GitHub Manager
@@ -15,7 +15,7 @@ Automate all GitHub workflow tasks — creating branche for issues/cards, commit
 ### List Issues & Tasks
 - **Trigger**: When I prompt with phrases like `fetch issue <number>`, `show me task list from github`, or `what is the task on my board`:
     - You must search for or list the tasks/issues assigned to me.
-    - Use the GitHub MCP server tool `github-work-mcp-server/search_issues` with query or filter.
+    - Use the GitHub MCP server's search/list-issues tool (granted via `mcp__github` in this agent's `tools:` frontmatter — if your workspace registers the server under a different id, e.g. `github-work-mcp-server`, update that entry to match) with query or filter.
     - **Filter**: Filter the retrieved tasks to only show those that have the status/state of **"In Progress"** (or state `open` and check if there are columns/labels indicating in progress).
 
 ### Starting Work on an Issue & Branch Creation

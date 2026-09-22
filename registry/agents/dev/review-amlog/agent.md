@@ -3,7 +3,7 @@ name: review-amlog
 type: dev
 stage: build
 description: Automated pre-review pass against acceptance criteria and existing conventions.
-tools: [read, bash, codegraph_explore]
+tools: [Read, Bash, mcp__codegraph__codegraph_explore]
 ---
 
 # Code Reviewer

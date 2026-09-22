@@ -321,8 +321,8 @@ If you don't create this file, `amlog install` will detect a plausible multi-zon
 | `security-review-amlog` | `dev` | build | — | — | — |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | — | — |
 | `review-amlog` | `dev` | build | — | — | — |
-| `planner-amlog` | `fe` | planning | — | `angular` | ✅ Developer must confirm the plan |
-| `implementor-amlog` | `fe` | build | — | `angular` | — |
+| `planner-amlog` | `fe` | planning | — | `angular`, `react` | ✅ Developer must confirm the plan |
+| `implementor-amlog` | `fe` | build | — | `angular`, `react` | — |
 | `browser-launcher-amlog` | `fe` | build | — | `webapp-testing` | — |
 | `planner-amlog` | `be` | planning | — | `dotnet` | ✅ Developer must confirm the plan |
 | `implementor-amlog` | `be` | build | — | `dotnet` | — |
@@ -346,10 +346,12 @@ name: implementor-amlog
 type: fe
 stage: build
 description: Implements the planned front-end changes.
-tools: [read, write, edit, bash, codegraph_explore]
+tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
 skills: [angular]
 ---
 ```
+
+> **Tool names must match the target CLI's exact spelling.** For Claude Code, native tools are capitalized (`Read`, `Write`, `Edit`, `Bash`, `WebSearch`, `WebFetch`) — a lowercase `read`/`write`/etc. is silently invisible to the subagent. MCP tools use `mcp__<server-id>__<tool-name>` for one specific tool, or the bare `mcp__<server-id>` to grant every tool a server exposes (used for `mcp__github` on the GitHub-manager agents and `mcp__figma` on the frontend planner/implementor, both of which need many tools from those servers). `<server-id>` must match the id the MCP server is actually registered under in your workspace — adjust it if yours differs from `github`/`figma`.
 
 `amlog install` converts that definition into **each selected tool's own native format and folder** (see the table in [What is amlog?](#what-is-amlog)), so the tool discovers and can invoke it itself — no manual `@`-referencing needed. Exact invocation syntax is each tool's own (check its docs); roughly:
 
@@ -383,10 +385,13 @@ A **skill** is reusable knowledge factored out of individual agents so the same 
 | Skill | Used by | What it covers |
 |---|---|---|
 | `angular` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/module structure, API data flow, NgRx/signals state, naming/barrel conventions, `ng build`/`ng lint` verification |
+| `react` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/hook structure, API data flow via existing data-fetching layer, Redux/Zustand/Context state, naming/folder conventions, build/lint/test verification |
 | `dotnet` | `planner-amlog` (be), `implementor-amlog` (be) | Layered architecture (Controllers/Services/Repositories/DTOs), API contract, FluentValidation, `dotnet build`/`dotnet test` verification |
 | `webapp-testing` | `browser-launcher-amlog` (fe) | Playwright-driven headless browser verification — adapted from Anthropic's official `webapp-testing` skill (Apache-2.0; see `registry/skills/webapp-testing/THIRD_PARTY_NOTICE.md`) |
 
-**Skills are self-updating, not static.** Before applying a skill's guidance, `planner-amlog`/`implementor-amlog` check what they actually observe in the codebase (via `codegraph_explore`) against what the skill file says, and correct the skill file in place — additively, never a full rewrite — when the team's conventions have drifted. A skill stays current without anyone having to maintain it by hand.
+Both `angular` and `react` are installed for every `fe` agent, but only one is *applied* per run: `planner-amlog`/`implementor-amlog` detect the target codebase's framework (via `package.json` dependencies or file extensions) and load the matching skill, so the same agent works unmodified against either stack.
+
+**Skills are self-updating, not static.** Before applying a skill's guidance, `planner-amlog`/`implementor-amlog` check what they actually observe in the codebase (via `codegraph_explore`) against what the selected skill file says, and correct that skill file in place — additively, never a full rewrite — when the team's conventions have drifted. A skill stays current without anyone having to maintain it by hand.
 
 ---
 
