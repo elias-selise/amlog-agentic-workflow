@@ -20,6 +20,8 @@
 - [Multi-zone repos](#multi-zone-repos-frontend--backend-in-one-repo)
 - [Agent roster](#agent-roster)
 - [How agents work](#how-agents-work)
+- [Automatic agent routing](#automatic-agent-routing)
+- [Handoff automation & loop guard](#handoff-automation--loop-guard)
 - [Skills](#skills)
 - [Agent flow: the full cycle](#agent-flow-the-full-cycle)
 - [Human-in-the-loop gates](#human-in-the-loop-gates)
@@ -184,6 +186,7 @@ amlog upgrade [version]        Update the amlog CLI itself
 amlog list                     Show every agent in the registry, with type/stage
 amlog status                   Show installed agents (by tool + role) + CodeGraph index status
 amlog doctor                   Diagnose the local environment + detect a legacy .amlog/agents/ install
+amlog handoff <action>         Agent handoff loop guard: check | record | reset | status
 amlog -v, --version            Print installed CLI version
 amlog -h, --help               Show help (also works per-subcommand, e.g. `amlog install --help`)
 ```
@@ -207,6 +210,7 @@ Installs agents into the current workspace and bootstraps CodeGraph. Any role/to
 | `--tools <csv>` | Explicit tool ids: `claude,codex,opencode,antigravity` |
 | `--yes` | Skip all confirmation/interactive prompts |
 | `--location <scope>` | Where CLI config lives: `global` \| `local` (default: `global`) |
+| `--auto-handover` / `--no-auto-handover` | Write `auto_handover: true` / `false` to `amlog-workflow.config.json` without prompting (see [Handoff automation](#handoff-automation--loop-guard)). Without either flag, install asks once and keeps any value already set. |
 
 Role flags and tool flags combine freely — e.g. `amlog install --backend --qa --claude --codex` installs both roles for both tools in one pass.
 
@@ -241,7 +245,18 @@ Shows installed agents grouped by tool then role, whether CodeGraph is wired for
 
 ### `amlog doctor`
 
-Diagnoses the local environment: Node.js version and platform, the resolved CodeGraph command/path (and whether it's reachable and wired for each installed tool), which agent-instruction file was detected (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CURSOR.md`), whether `.amlog/state.json` exists, and whether a legacy `.amlog/agents/` tree still needs migrating. Run this first when something looks off after install.
+Diagnoses the local environment: Node.js version and platform, the resolved CodeGraph command/path (and whether it's reachable and wired for each installed tool), which agent-instruction file was detected (`AGENTS.md` / `CLAUDE.md` / `GEMINI.md` / `CURSOR.md`), whether `.amlog/state.json` exists, whether the [agent routing section](#automatic-agent-routing) is present, the effective `auto_handover` / `max_handoff_repeats` settings, and whether a legacy `.amlog/agents/` tree still needs migrating. Run this first when something looks off after install.
+
+### `amlog handoff <action>`
+
+The loop guard agents (or the orchestrating session) call before passing work to another agent. It's meant for agents to call, not people, so its output is plain `KEY: value` lines. See [Handoff automation & loop guard](#handoff-automation--loop-guard).
+
+| Action | What it does |
+|---|---|
+| `check --issue <n> --from <agent>/<type> --to <agent>/<type>` | Prints `DECISION: PROCEED` (auto handover on), `CONFIRM` (ask the user first) or `ASK_HUMAN` (loop limit reached), plus the earlier attempts for that pair |
+| `record --issue <n> --from … --to … --reason "…"` | Appends the handoff to `.amlog/handoffs/<n>.log`. Add `--human-approved` after a human OKs going past the loop limit; that restarts the count for the pair. |
+| `reset --issue <n> [--from … --to …]` | Restarts the count for one pair, or for every pair of the issue |
+| `status [--issue <n>]` | Shows the effective settings and, with `--issue`, the current count per pair |
 
 ---
 
@@ -267,6 +282,8 @@ amlog uninstall
 # Remove agents only (keep the CodeGraph index)
 amlog uninstall --keep-knowledge-base
 ```
+
+Uninstall also strips the amlog routing section from `CLAUDE.md` / `AGENTS.md`, and deletes the file if that section was all it contained.
 
 ---
 
@@ -316,14 +333,14 @@ If you don't create this file, `amlog install` will detect a plausible multi-zon
 | `knowledge-base-setup` | `dev` | platform | ✅ `setup-knowledge-base.sh` | — | — |
 | `story-writer-amlog` | `ba` | ba | — | — | ✅ BA must confirm AC + story |
 | `github-manager-ba-amlog` | `ba` | ba | — | — | — |
-| `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` | — | ✅ Always creates `instructions.md`; commits need explicit approval |
+| `github-manager-amlog` | `dev` | cross-cutting | ✅ `commit-and-pr.sh` | — | ✅ Always creates `instructions.md`; commits and PR branches need explicit approval |
 | `researcher-amlog` | `dev` | planning | — | — | — |
 | `security-review-amlog` | `dev` | build | — | — | — |
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | — | — |
 | `review-amlog` | `dev` | build | — | — | — |
 | `planner-amlog` | `fe` | planning | — | `angular`, `react` | ✅ Developer must confirm the plan |
 | `implementor-amlog` | `fe` | build | — | `angular`, `react` | — |
-| `browser-launcher-amlog` | `fe` | build | — | `webapp-testing` | — |
+| `browser-launcher-amlog` | `fe` | build | — | `webapp-testing` | ✅ Human verifies the UI visually |
 | `planner-amlog` | `be` | planning | — | `dotnet` | ✅ Developer must confirm the plan |
 | `implementor-amlog` | `be` | build | — | `dotnet` | — |
 | `test-runner-amlog` | `be` | build | ✅ `run-affected-tests.sh` | — | — |
@@ -384,6 +401,64 @@ NEXT AGENT: implementor-amlog (fe) — implement confirmed plan docs/42/plan.md
 
 If your tool doesn't auto-chain, watch for that line and act on it — that's the signal a handoff didn't happen automatically.
 
+Whether that handoff then happens without asking you depends on `auto_handover`, and every handoff goes through a loop guard first. See [Handoff automation & loop guard](#handoff-automation--loop-guard).
+
+---
+
+## Automatic agent routing
+
+You don't need to name an agent. `amlog install` / `amlog update` writes a marker-fenced routing section (`<!-- amlog:router:start -->` … `<!-- amlog:router:end -->`) into the instruction file each installed tool reads at the start of every session:
+
+| Tool | File |
+|---|---|
+| Claude Code | `CLAUDE.md`. Skipped if `CLAUDE.md` already imports `@AGENTS.md` and `AGENTS.md` gets the section anyway. |
+| Codex, OpenCode, Antigravity | `AGENTS.md` |
+
+The section tells the main session to match every request against a routing table built from the agents actually installed (each agent's `triggers` in `registry/manifest.json`) and delegate on its own. It also carries a few rules that go beyond the table:
+
+- pick `fe` vs `be` from the paths, labels or code the task touches
+- resume an issue from whatever its `docs/<issue-number>/` files show is done
+- always send a new feature to the planner before the implementor
+- handle anything that doesn't match (questions, explanations, one-line tweaks) directly, without an agent
+
+So *"we need a CSV export on the orders page"* goes to `story-writer-amlog`, *"let's work with #42"* goes to `github-manager-amlog`, and *"run the tests for my change"* goes to `test-runner-amlog`. The session announces each pick in one line (`→ Routing to …`).
+
+Each agent's frontmatter `description` also ends with a *"Use when…"* clause. Tools that auto-delegate to subagents from their description (Claude Code, OpenCode) pick the right agent even outside the routing table.
+
+The routing text itself lives in `registry/router/ROUTER.md`. Edit it there, never in a workspace's `CLAUDE.md` / `AGENTS.md`, because `amlog update` rewrites the section.
+
+---
+
+## Handoff automation & loop guard
+
+Two settings in `amlog-workflow.config.json` control agent-to-agent handoffs:
+
+```json
+{
+  "auto_handover": false,
+  "max_handoff_repeats": 3
+}
+```
+
+| Key | Default | Effect |
+|---|---|---|
+| `auto_handover` | `false` | `true`: agents hand off to the next agent with no confirmation. `false`: you're asked `Hand off to <agent>? (yes / no)` before each handoff. |
+| `max_handoff_repeats` | `3` | When the same handoff (same from-agent, same to-agent, same issue) comes up for the 3rd time, the chain stops and a human is asked, whatever `auto_handover` says. |
+
+`amlog install` asks for `auto_handover` once (or takes `--auto-handover` / `--no-auto-handover`). To change it later, edit the file; agents read it at every handoff.
+
+**`auto_handover: true` never skips a mandatory human gate.** See [Human-in-the-loop gates](#human-in-the-loop-gates). The AC confirmation, the instructions file, the plan review, the visual UI check, tester edge cases, and commit/PR approval all still wait for you.
+
+**Loop guard.** Every handoff is logged to `.amlog/handoffs/<issue-number>.log` (the story name is used before an issue exists). Before handing off, the agent or orchestrating session runs `amlog handoff check`. Agents without a shell count the log by hand using the same rules. Say `implementor-amlog (be)` → `test-runner-amlog (be)` is about to happen for the 3rd time on issue #42, meaning the tests failed twice already. Instead of looping, the agent stops with:
+
+```
+HUMAN INPUT REQUIRED: loop limit — implementor-amlog (be) -> test-runner-amlog (be) for issue 42 would be attempt 3. <what keeps failing>. Reply "continue" to hand off again, or say what to change.
+```
+
+It lists the earlier attempts alongside that line. Reply "continue" and the handoff is recorded as human-approved, which restarts the count for that pair. Or give different direction. `amlog handoff status --issue 42` shows where each pair stands.
+
+The shared rules every agent follows live in one skill, `.amlog/skills/handoff-protocol/SKILL.md`, and not in 15 copies. Agents signal the orchestrating session with two standard final lines: `NEXT AGENT: …` means a handoff is ready, and `HUMAN INPUT REQUIRED: …` means the agent is stopped at a gate or at the loop limit.
+
 ---
 
 ## Skills
@@ -395,6 +470,7 @@ A **skill** is reusable knowledge factored out of individual agents so the same 
 | `angular` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/module structure, API data flow, NgRx/signals state, naming/barrel conventions, `ng build`/`ng lint` verification |
 | `react` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/hook structure, API data flow via existing data-fetching layer, Redux/Zustand/Context state, naming/folder conventions, build/lint/test verification |
 | `dotnet` | `planner-amlog` (be), `implementor-amlog` (be) | Layered architecture (Controllers/Services/Repositories/DTOs), API contract, FluentValidation, `dotnet build`/`dotnet test` verification |
+| `handoff-protocol` | every agent that hands off | Process skill, not codebase knowledge: the loop guard, `auto_handover`, the mandatory human gates, and the `NEXT AGENT:` / `HUMAN INPUT REQUIRED:` final lines. Agents never self-edit it. |
 | `webapp-testing` | `browser-launcher-amlog` (fe) | Playwright-driven headless browser verification — adapted from Anthropic's official `webapp-testing` skill (Apache-2.0; see `registry/skills/webapp-testing/THIRD_PARTY_NOTICE.md`) |
 
 Both `angular` and `react` are installed for every `fe` agent, but only one is *applied* per run: `planner-amlog`/`implementor-amlog` detect the target codebase's framework (via `package.json` dependencies or file extensions) and load the matching skill, so the same agent works unmodified against either stack.
@@ -499,13 +575,16 @@ The three diamonds (`G1`, `G2`, `G3`) are the hard human-in-the-loop stops — s
 
 ## Human-in-the-loop gates
 
-Three points in the cycle are hard stops — the agent must get an explicit human response before continuing, not just ask and proceed regardless:
+These points in the cycle are hard stops. The agent must get an explicit human response before continuing, not just ask and proceed regardless. They apply even when `auto_handover` is `true`, and each one ends the agent's message with a `HUMAN INPUT REQUIRED: …` line:
 
 | Gate | Agent | What it waits for |
 |---|---|---|
 | **BA approval** | `story-writer-amlog` | Explicit confirmation of the AC and story description. A request for changes sends the agent back to revise and re-confirm — it never hands off on an unconfirmed story. |
 | **Developer plan review** | `planner-amlog` (fe/be) | The developer's review of the written plan, before `implementor-amlog` starts coding. Requested changes loop back into the plan; even "proceed as-is" requires an explicit response. |
 | **Tester edge-case input** | `test-generator-amlog` | The tester's own edge/corner cases, on top of whatever the agent identified autonomously, before any test is written. |
+| **Visual verification** | `browser-launcher-amlog` | Once the automated AC check passes, a human looks at the screenshots (desktop + mobile) or the running app and confirms the UI. A reported problem goes back to `implementor-amlog` (fe). |
+| **Commit / PR approval** | `github-manager-amlog` | Approval of the drafted commit message, and confirmation of the PR source and target branches. |
+| **Loop limit** | any agent | The same handoff for the same issue would happen for the `max_handoff_repeats`-th time. See [Handoff automation & loop guard](#handoff-automation--loop-guard). |
 
 A fourth item is a mandatory *action*, not a confirmation gate: `github-manager-amlog` always creates `docs/<issue-number>/instructions.md` when starting work on an issue — even if the user gives nothing beyond the issue itself — so there's always a concrete file for developer involvement instead of technical detail living only in chat history.
 

@@ -12,12 +12,42 @@ const { bootstrapKnowledgeBase, detectPlausibleZones } = require('../lib/knowled
 const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
 const { canPrompt } = require('../lib/prompt-utils');
-
-const CONFIG_FILE = 'amlog-workflow.config.json';
+const { CONFIG_FILE, readWorkflowConfig, updateWorkflowConfig } = require('../lib/workflow-config');
 
 const WORKSPACE = process.cwd();
 
 const TOOL_CHOICES = TOOL_IDS.map((id) => ({ title: getAdapter(id).label, value: id }));
+
+/**
+ * Set `auto_handover` in amlog-workflow.config.json: from --auto-handover /
+ * --no-auto-handover if given, otherwise ask once. An existing value is kept
+ * unless a flag overrides it; with no flag and no prompt, nothing is written
+ * and agents fall back to the default (ask before each handoff).
+ *
+ * @param {string} workspaceDir
+ * @param {object} opts - CLI options
+ */
+async function configureAutoHandover(workspaceDir, opts) {
+  const current = readWorkflowConfig(workspaceDir).auto_handover;
+  let value;
+  if (typeof opts.autoHandover === 'boolean') {
+    value = opts.autoHandover;
+  } else if (typeof current === 'boolean' || !canPrompt(opts)) {
+    return;
+  } else {
+    const { auto } = await prompts({
+      type: 'confirm',
+      name: 'auto',
+      message: 'Let agents hand off to each other automatically? (you are still asked at mandatory gates: AC, instructions file, plan, visual check, test cases)',
+      initial: false,
+    });
+    if (typeof auto !== 'boolean') return;
+    value = auto;
+  }
+  if (value === current) return;
+  updateWorkflowConfig(workspaceDir, { auto_handover: value });
+  console.log(chalk.green(`  ✓ Set auto_handover: ${value} in ${CONFIG_FILE}`));
+}
 
 /**
  * `amlog install` command.
@@ -135,6 +165,9 @@ async function runInstall(opts) {
       }
     }
   }
+
+  // 5c. Agent-to-agent handoff mode
+  await configureAutoHandover(WORKSPACE, opts);
 
   // 6. Bootstrap knowledge base
   await bootstrapKnowledgeBase(WORKSPACE, targetTools, opts);

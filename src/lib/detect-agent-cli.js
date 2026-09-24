@@ -23,21 +23,24 @@ function detectAgentInstructionFile(workspaceDir) {
 }
 
 /**
- * Remove a legacy amlog-managed `<!-- amlog:start --> ... <!-- amlog:end -->`
- * section from one instruction file, if present. Leaves the rest of the
- * file untouched. Returns true if the file was modified.
+ * Remove a marker-fenced amlog-managed section from one instruction file, if
+ * present — by default the legacy `<!-- amlog:start --> ... <!-- amlog:end -->`
+ * one. Leaves the rest of the file untouched, and deletes the file if nothing
+ * else is left in it. Returns true if the file was modified.
  *
  * @param {string} filePath
+ * @param {string} [startMarker]
+ * @param {string} [endMarker]
  * @returns {boolean}
  */
-function stripAmlogSection(filePath) {
+function stripAmlogSection(filePath, startMarker = START_MARKER, endMarker = END_MARKER) {
   if (!fs.existsSync(filePath)) return false;
 
   const content = fs.readFileSync(filePath, 'utf8');
-  const startIdx = content.indexOf(START_MARKER);
+  const startIdx = content.indexOf(startMarker);
   if (startIdx === -1) return false;
-  const endIdx = content.indexOf(END_MARKER);
-  const sliceEnd = endIdx === -1 ? content.length : endIdx + END_MARKER.length;
+  const endIdx = content.indexOf(endMarker, startIdx);
+  const sliceEnd = endIdx === -1 ? content.length : endIdx + endMarker.length;
 
   const cleaned = (content.slice(0, startIdx) + content.slice(sliceEnd))
     .replace(/\n{3,}/g, '\n\n')

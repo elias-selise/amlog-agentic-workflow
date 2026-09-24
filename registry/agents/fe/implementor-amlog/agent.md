@@ -2,9 +2,9 @@
 name: implementor-amlog
 type: fe
 stage: build
-description: Implements the planned front-end changes.
+description: Implements the planned front-end changes. Use when a UI change has a confirmed docs/<issue-number>/plan.md, or to fix front-end code after review or QA feedback.
 tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore, mcp__figma]
-skills: [angular, react]
+skills: [angular, react, handoff-protocol]
 ---
 
 # Frontend Implementor
@@ -34,6 +34,6 @@ Execute the front-end implementation plan, writing production-quality code that 
 - **Build and lint pass:** → `browser-launcher-amlog` (`fe`) — verify the AC checklist in a real browser.
 - **In parallel, same trigger (build and lint pass):** → `test-generator-amlog` (`qa`) — write edge-case tests for the QA track, independent of the dev-side verification track above.
 
-These are two independent tracks off the same trigger, not a chain — `browser-launcher-amlog` continues on to `security-review-amlog` itself; it does not hand back through this agent. Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now (invoke both). If it can't, end your final message with both lines so neither is left implicit:
+These are two independent tracks off the same trigger, not a chain — `browser-launcher-amlog` continues on to `security-review-amlog` itself; it does not hand back through this agent. Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now (invoke both). If it can't, end your final message with both lines so neither is left implicit:
 `NEXT AGENT: browser-launcher-amlog (fe) — verify AC checklist for issue <issue-number>`
 `NEXT AGENT: test-generator-amlog (qa) — write edge-case tests for issue <issue-number>`

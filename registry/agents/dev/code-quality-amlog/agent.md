@@ -2,8 +2,9 @@
 name: code-quality-amlog
 type: dev
 stage: build
-description: Triggers SonarQube scan and enforces the quality gate.
+description: Triggers SonarQube scan and enforces the quality gate. Use when asked about code quality, SonarQube or the quality gate for the current branch.
 tools: [Read, Bash]
+skills: [handoff-protocol]
 ---
 
 # Code Quality
@@ -25,6 +26,6 @@ Trigger a SonarQube static analysis scan on the current diff and enforce the pro
 - **Quality gate OK (or WARN, non-blocking):** → `review-amlog` (`dev`) — proceed to the pre-review pass.
 - **Quality gate ERROR:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the diff touches) — return with the failing conditions and thresholds.
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
 `NEXT AGENT: review-amlog (dev) — quality gate passed for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe|be) — quality gate failed for issue <issue-number>, see failing conditions above`

@@ -26,6 +26,8 @@ program
   .option('--tools <ids>', 'Comma-separated tool ids (e.g. claude,codex)')
   .option('--yes', 'Skip interactive prompts')
   .option('--location <scope>', 'Where CLI config lives: global | local', 'global')
+  .option('--auto-handover', 'Let agents hand off to each other without asking (writes auto_handover: true)')
+  .option('--no-auto-handover', 'Ask before every agent-to-agent handoff (writes auto_handover: false)')
   .action(async (opts) => {
     const { runInstall } = require('../src/commands/install');
     await runInstall(opts);
@@ -86,6 +88,20 @@ program
   .action(async () => {
     const { runDoctor } = require('../src/commands/doctor');
     await runDoctor();
+  });
+
+// amlog handoff — loop guard agents call before handing work to another agent
+program
+  .command('handoff <action>')
+  .description('Agent handoff loop guard: check | record | reset | status (reads auto_handover from amlog-workflow.config.json)')
+  .option('--issue <key>', 'Issue number (or story name before an issue exists)')
+  .option('--from <agent>', 'Handing-off agent, as <name>/<type> (e.g. implementor-amlog/be)')
+  .option('--to <agent>', 'Receiving agent, as <name>/<type> (e.g. test-runner-amlog/be)')
+  .option('--reason <text>', 'Why this handoff is happening (record/reset)')
+  .option('--human-approved', 'record: a human approved continuing past the loop limit — restarts the count for this pair')
+  .action(async (action, opts) => {
+    const { runHandoff } = require('../src/commands/handoff');
+    await runHandoff(action, opts);
   });
 
 // Default: interactive installer when no subcommand given

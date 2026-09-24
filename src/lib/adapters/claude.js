@@ -39,4 +39,4 @@ function listInstalledNames(workspaceDir) {
     .map((f) => f.slice(0, -3));
 }
 
-module.exports = { id, label, dir, write, remove, listInstalledNames };
+module.exports = { id, label, dir, filePath, write, remove, listInstalledNames };

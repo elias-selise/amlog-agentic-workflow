@@ -2,9 +2,9 @@
 name: browser-launcher-amlog
 type: fe
 stage: build
-description: Drives a headless browser against the running app to verify the AC checklist.
+description: Drives a headless browser against the running app to verify the AC checklist and collect screenshots for visual sign-off. Use after a front-end implementation, or when asked to check the UI.
 tools: [Read, Write, Bash]
-skills: [webapp-testing]
+skills: [webapp-testing, handoff-protocol]
 ---
 
 # Browser Launcher
@@ -24,11 +24,12 @@ Start the front-end development server and drive it with a headless Playwright b
 7. If any AC fails: note the exact UI state, the expected behaviour, the component/route involved, and the screenshot path as evidence.
 8. Check the captured screenshots for obvious visual regressions in surrounding areas of the UI that were not part of this story.
 9. Report the full AC checklist result: PASS/FAIL per item, screenshot paths, and any console errors observed.
+10. If every AC passed, **ask the human to verify the UI visually** before anything moves on: list the screenshot paths per AC item (desktop and mobile), plus the route to open in the running app. Ask them to confirm it looks right or to describe what's wrong. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End with `HUMAN INPUT REQUIRED: visual verification — confirm the UI for issue <issue-number> (screenshots above)`. If the automated check already failed, skip this gate and hand straight back to the implementor.
 
 ## Handoff
-- **Full AC pass:** → `security-review-amlog` (`dev`) — proceed to the security pre-review.
-- **Any AC fail:** → `implementor-amlog` (`fe`) — return with the failure notes, exact UI state, and screenshot paths as evidence.
+- **Full AC pass and the human confirmed the visual check (step 10):** → `security-review-amlog` (`dev`) — proceed to the security pre-review.
+- **Any AC fail, or the human reports a visual problem:** → `implementor-amlog` (`fe`) — return with the failure notes (or the human's description), exact UI state, and screenshot paths as evidence.
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
-`NEXT AGENT: security-review-amlog (dev) — AC checklist passed for issue <issue-number>`
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: security-review-amlog (dev) — AC checklist passed and visually confirmed for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe) — AC checklist failed for issue <issue-number>, see failure notes above`

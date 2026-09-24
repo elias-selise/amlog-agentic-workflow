@@ -2,9 +2,9 @@
 name: planner-amlog
 type: fe
 stage: planning
-description: Breaks the spec into a front-end implementation plan using codegraph_explore.
+description: Breaks the spec into a front-end implementation plan using codegraph_explore. Use when the user wants to plan, design or start a UI (Angular/React) change that has no confirmed plan yet.
 tools: [Read, Write, mcp__codegraph__codegraph_explore, mcp__figma]
-skills: [angular, react]
+skills: [angular, react, handoff-protocol]
 ---
 
 # Frontend Planner
@@ -21,8 +21,8 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
 6. Following the skill's planning guidance, identify affected/new components, services, and modules; define the API data flow; and identify any shared state changes required.
 7. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
 8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
-9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete.
-10. After the plan is confirmed, ask the user if they need further research on this plan; if they do, invoke `researcher-amlog` to independently research on the plan.
+9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End the message that asks with `HUMAN INPUT REQUIRED: plan review — docs/<issue-number>/plan.md`.
+10. In the same message as the plan review (step 9), also ask whether they want further research on this plan, so it doesn't cost an extra round trip. If they do, invoke `researcher-amlog` to research the plan independently.
 11. Append a new entry to `.amlog/history/planner-amlog--fe.md` for this issue:
    ```
    ## Issue <issue-number> — <date>
@@ -38,6 +38,6 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
 - **Developer has confirmed the plan (step 9):** → `implementor-amlog` (`fe`) — begin coding from `docs/<issue-number>/plan.md`.
 - **Developer requests changes:** stay in this agent, revise, and re-confirm — never hand off on an unreviewed plan.
 
-Hand off the moment a condition above is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment a condition above is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
 `NEXT AGENT: researcher-amlog (dev) — research open question(s) for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe) — implement confirmed plan docs/<issue-number>/plan.md`

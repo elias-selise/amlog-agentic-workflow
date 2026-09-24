@@ -2,8 +2,9 @@
 name: researcher-amlog
 type: dev
 stage: planning
-description: Shared research support for libraries, external APIs, and prior art.
+description: Shared research support for libraries, external APIs, and prior art. Use when a planned change needs a package comparison or external research.
 tools: [Read, Bash, mcp__codegraph__codegraph_explore, WebSearch, WebFetch]
+skills: [handoff-protocol]
 ---
 
 # Researcher
@@ -24,5 +25,5 @@ Provide research support to planning agents by investigating third-party librari
 ## Handoff
 - **Research complete:** → `planner-amlog` (`fe` or `be` — whichever planner invoked this research) — return with `docs/<issue-number>/research.md` to inform the plan.
 
-This agent is only reached when a planner explicitly asks for it (currently: `planner-amlog` (fe) step 10) — it never initiates on its own. Hand off the moment research is written — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+This agent is only reached when a planner explicitly asks for it (currently: `planner-amlog` (fe) step 10) — it never initiates on its own. Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment research is written — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
 `NEXT AGENT: planner-amlog (fe|be) — research complete for issue <issue-number>, see docs/<issue-number>/research.md`

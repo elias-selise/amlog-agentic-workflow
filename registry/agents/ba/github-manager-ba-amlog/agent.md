@@ -2,7 +2,7 @@
 name: github-manager-ba-amlog
 type: ba
 stage: ba
-description: Owns card creation and board sync.
+description: Owns card creation and board sync. Use right after a story's AC are confirmed, to create its GitHub issue and set its board status.
 tools: [Read, Bash, mcp__github]
 ---
 
