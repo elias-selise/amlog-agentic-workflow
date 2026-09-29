@@ -28,6 +28,15 @@ const ROUTER_FILES = [...new Set(Object.values(TOOL_INSTRUCTION_FILE))];
 // AGENTS.md's routing section then, so writing a second copy is just noise.
 const IMPORTS_AGENTS_MD = /(^|\s)@(\.\/)?AGENTS\.md\b/m;
 
+// How each tool starts a named subagent. Codex only spawns a custom agent when
+// asked to by name, so its hint says to ask for it explicitly.
+const INVOKE_HINT = {
+  claude: 'invoke the subagent with the Agent tool (`subagent_type` = the agent id).',
+  codex: 'spawn the custom agent by name, e.g. "Spawn the `<agent-id>` agent to <task>" (Codex only spawns agents you name).',
+  opencode: 'invoke the subagent with the Task tool (`subagent_type` = the agent id).',
+  antigravity: 'delegate to the subagent named by the agent id (`agents/agents/<agent-id>/AGENT.md`).',
+};
+
 function escapeCell(text) {
   return String(text || '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
 }
@@ -86,8 +95,14 @@ function buildRouterSection(workspaceDir, installs, tools) {
   });
   const definitions = ['Agent definition files (the fallback in rule 6):', ...defLines].join('\n');
 
+  const invokeHints = tools
+    .filter((tool) => INVOKE_HINT[tool])
+    .map((tool) => `   - ${getAdapter(tool).label}: ${INVOKE_HINT[tool]}`)
+    .join('\n');
+
   const body = fs.readFileSync(TEMPLATE_PATH, 'utf8')
     .replace('{{ROUTING_TABLE}}', table)
+    .replace('{{INVOKE_HINTS}}', invokeHints)
     .replace('{{DEFINITION_FILES}}', definitions)
     .trimEnd();
 
