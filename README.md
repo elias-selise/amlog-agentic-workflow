@@ -483,7 +483,7 @@ Both `angular` and `react` are installed for every `fe` agent, but only one is *
 
 This is not a linear pipeline. Every build-stage gate can bounce work back to an implementor, and dev-side self-verification (browser/test-runner → security → quality → review) runs as a track parallel to QA (test-generator → test-executor) — both converge on `github-manager-amlog` before merge. `github-manager-amlog` itself appears twice below because it's invoked at two different points in the cycle (kicking off work, and again at PR time) — it's one agent, not two.
 
-![Agent flow: the full cycle](docs/images/agent-flow-full-cycle.png)
+![Agent flow: the full cycle](https://raw.githubusercontent.com/elias-selise/amlog-agentic-workflow/main/docs/images/agent-flow-full-cycle.png)
 
 > The image above is a static render for viewers that don't support Mermaid (npmjs.com's package preview, some IDEs/editors). On GitHub, expand the block below to see and edit the live Mermaid source it was generated from — if you change the flow, regenerate the PNG from it (`npx @mermaid-js/mermaid-cli -i <source>.mmd -o docs/images/agent-flow-full-cycle.png -b white -w 1600`) so the two stay in sync.
 
