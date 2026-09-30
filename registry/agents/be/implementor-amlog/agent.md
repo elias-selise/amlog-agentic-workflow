@@ -2,9 +2,9 @@
 name: implementor-amlog
 type: be
 stage: build
-description: Implements the planned back-end changes.
+description: Implements the planned back-end changes. Use when a back-end change has a confirmed docs/<issue-number>/plan.md, or to fix back-end code after review or QA feedback.
 tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
-skills: [dotnet]
+skills: [dotnet, handoff-protocol]
 ---
 
 # Backend Implementor
@@ -33,6 +33,6 @@ Execute the back-end implementation plan, writing production-quality code that p
 - **Build and test pass:** → `test-runner-amlog` (`be`) — run the codegraph-affected test suite.
 - **In parallel, same trigger (build and test pass):** → `test-generator-amlog` (`qa`) — write edge-case tests for the QA track, independent of the dev-side verification track above.
 
-These are two independent tracks off the same trigger, not a chain — `test-runner-amlog` continues on to `security-review-amlog` itself; it does not hand back through this agent. Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now (invoke both). If it can't, end your final message with both lines so neither is left implicit:
+These are two independent tracks off the same trigger, not a chain — `test-runner-amlog` continues on to `security-review-amlog` itself; it does not hand back through this agent. Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now (invoke both). If it can't, end your final message with both lines so neither is left implicit:
 `NEXT AGENT: test-runner-amlog (be) — run affected tests for issue <issue-number>`
 `NEXT AGENT: test-generator-amlog (qa) — write edge-case tests for issue <issue-number>`

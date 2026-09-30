@@ -189,7 +189,7 @@ function warnWireFailure() {
  */
 function isCodegraphWiredForTool(toolId) {
   const cmd = getCodegraphCommand();
-  const result = spawnSync(cmd, ['install', '--print-config', toolId], { encoding: 'utf8' });
+  const result = spawnSync(cmd, ['install', '--print-config', toolId], { encoding: 'utf8', shell: process.platform === 'win32' });
   if (result.status !== 0) return false;
 
   const match = (result.stdout || '').match(/# Add to (.+)/);
@@ -226,7 +226,7 @@ function wireCodegraph(targetTools = []) {
     const result = spawnSync(
       cmd,
       ['install', `--target=${toWire.join(',')}`, '--location=global', '--yes'],
-      { stdio: 'inherit' }
+      { stdio: 'inherit', shell: process.platform === 'win32' }
     );
     if (result.status !== 0) {
       warnWireFailure();
@@ -238,7 +238,7 @@ function wireCodegraph(targetTools = []) {
   const result = spawnSync(
     cmd,
     ['install', '--target=auto', '--location=global', '--yes'],
-    { stdio: 'inherit' }
+    { stdio: 'inherit', shell: process.platform === 'win32' }
   );
   if (result.status !== 0) {
     warnWireFailure();
@@ -282,7 +282,7 @@ function initZones(zones, workspaceDir) {
       continue;
     }
     console.log(chalk.cyan(`  Indexing zone: ${zone}`));
-    spawnSync(cmd, ['init'], { cwd: target, stdio: 'inherit' });
+    spawnSync(cmd, ['init'], { cwd: target, stdio: 'inherit', shell: process.platform === 'win32' });
   }
 }
 
@@ -298,7 +298,7 @@ function printZoneStatus(zones, workspaceDir) {
     const target = path.resolve(workspaceDir, zone);
     if (!fs.existsSync(target)) continue;
     console.log(chalk.bold(`\n  --- ${zone} ---`));
-    spawnSync(cmd, ['status'], { cwd: target, stdio: 'inherit' });
+    spawnSync(cmd, ['status'], { cwd: target, stdio: 'inherit', shell: process.platform === 'win32' });
   }
 }
 
@@ -372,7 +372,7 @@ async function bootstrapKnowledgeBase(workspaceDir, targetTools = [], opts = {})
   if (isCodegraphInstalled()) {
     console.log(chalk.green('  ✓ CodeGraph CLI already installed.'));
     // Check for updates (non-fatal)
-    const upgradeCheck = spawnSync(cmd, ['upgrade', '--check'], { stdio: 'inherit' });
+    const upgradeCheck = spawnSync(cmd, ['upgrade', '--check'], { stdio: 'inherit', shell: process.platform === 'win32' });
     if (upgradeCheck.status !== 0) {
       console.log(chalk.yellow('  WARNING: failed to check for CodeGraph updates.'));
     }

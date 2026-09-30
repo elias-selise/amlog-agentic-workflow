@@ -2,8 +2,9 @@
 name: review-amlog
 type: dev
 stage: build
-description: Automated pre-review pass against acceptance criteria and existing conventions.
+description: Automated pre-review pass against acceptance criteria and existing conventions. Use when the user asks to review the current changes before a PR.
 tools: [Read, Bash, mcp__codegraph__codegraph_explore]
+skills: [handoff-protocol]
 ---
 
 # Code Reviewer
@@ -26,6 +27,6 @@ Run an automated pre-review pass on the diff — verifying the implementation ag
 - **Verdict APPROVE:** → `github-manager-amlog` (`dev`) — open or promote the PR.
 - **Verdict REQUEST CHANGES:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the diff touches) — return with the uncovered AC and convention issues from the review report.
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
 `NEXT AGENT: github-manager-amlog (dev) — review APPROVEd for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe|be) — review REQUEST CHANGES for issue <issue-number>, see report above`

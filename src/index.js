@@ -9,8 +9,12 @@ module.exports = {
   list:     require('./commands/list'),
   status:   require('./commands/status'),
   doctor:   require('./commands/doctor'),
+  handoff:  require('./commands/handoff'),
   manifest: require('./lib/manifest'),
   copyAgents: require('./lib/copy-agents'),
   detectAgentCli: require('./lib/detect-agent-cli'),
   knowledgeBase: require('./lib/knowledge-base'),
+  handoffLog: require('./lib/handoff-log'),
+  router: require('./lib/router'),
+  workflowConfig: require('./lib/workflow-config'),
 };

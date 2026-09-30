@@ -8,6 +8,8 @@ const { getCodegraphCommand, isCodegraphInstalled, isCodegraphWiredForTool, refr
 const { detectAgentInstructionFile } = require('../lib/detect-agent-cli');
 const { getInstalledTools } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
+const { findRouterSections } = require('../lib/router');
+const { getHandoffSettings } = require('../lib/workflow-config');
 
 const WORKSPACE = process.cwd();
 
@@ -65,6 +67,14 @@ async function runDoctor() {
   const stateFile = path.join(WORKSPACE, '.amlog', 'state.json');
   if (fs.existsSync(stateFile)) {
     ok('.amlog/state.json present', 'agents installed — see `amlog status`');
+    const routerFiles = findRouterSections(WORKSPACE);
+    if (routerFiles.length > 0) {
+      ok('Agent routing section', routerFiles.join(', '));
+    } else {
+      fail('No agent routing section found', 'run `amlog update` so prompts are routed to agents automatically');
+    }
+    const { autoHandover, maxHandoffRepeats } = getHandoffSettings(WORKSPACE);
+    ok('Handoff settings', `auto_handover: ${autoHandover}, max_handoff_repeats: ${maxHandoffRepeats}`);
   } else {
     fail('.amlog/state.json missing', 'run `amlog install` in this workspace');
   }

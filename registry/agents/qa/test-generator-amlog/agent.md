@@ -2,8 +2,9 @@
 name: test-generator-amlog
 type: qa
 stage: qa
-description: Writes edge-case tests the pre-QA gate did not cover.
+description: Writes edge-case tests the pre-QA gate did not cover. Use when asked for more tests, edge or security cases, or better coverage.
 tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
+skills: [handoff-protocol]
 ---
 
 # Test Generator
@@ -15,7 +16,7 @@ Analyse the implementation and its existing tests to identify and write edge-cas
 1. Read the story AC from `docs/<issue-number>/instructions.md` and the implementation plan.
 2. Use `codegraph_explore` to read the current test files for the changed components/services.
 3. Identify AC edge cases not covered by existing tests: boundary values, null/empty inputs, unauthorised access, concurrent requests, and security-specific payloads (SQL/NoSQL injection, XSS, auth-bypass/privilege-escalation, IDOR) for any input or endpoint touching user data or a permission check.
-4. **ALWAYS present this identified list to the user (the tester) and ask them to add any edge cases or corner cases of their own** — this is a hard gate, not a formality. Do not proceed to writing tests until they've responded, even if their response is "looks complete, proceed." Merge whatever they give you into the list before continuing.
+4. **ALWAYS present this identified list to the user (the tester) and ask them to add any edge cases or corner cases of their own** — this is a hard gate, not a formality. Do not proceed to writing tests until they've responded, even if their response is "looks complete, proceed." Merge whatever they give you into the list before continuing. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End the message that asks with `HUMAN INPUT REQUIRED: test cases — add edge/corner cases for issue <issue-number>`.
 5. For Angular: write new Jasmine/Jest specs in the appropriate `.spec.ts` file covering each edge case (both autonomously-identified and tester-supplied).
 6. For .NET: write new xUnit test methods in the appropriate test project covering each edge case (both autonomously-identified and tester-supplied).
 7. Follow the existing test patterns and naming conventions in each repo. Tag each new test with a lightweight category marker so `test-executor-amlog` can report per-category (e.g. `// category: boundary`, `[Trait("Category","Security")]` for xUnit).
@@ -25,5 +26,5 @@ Analyse the implementation and its existing tests to identify and write edge-cas
 ## Handoff
 - **Edge-case tests written and tester input incorporated (step 4):** → `test-executor-amlog` (`qa`) — run the full suite including the new tests.
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
 `NEXT AGENT: test-executor-amlog (qa) — run full suite for issue <issue-number>`

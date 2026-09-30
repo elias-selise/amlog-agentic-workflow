@@ -2,8 +2,9 @@
 name: test-runner-amlog
 type: be
 stage: build
-description: Runs codegraph affected + the impacted test suite before hand-off.
+description: Runs codegraph affected + the impacted test suite before hand-off. Use after a back-end implementation, or when asked to run the tests for the current change.
 tools: [Read, Bash, mcp__codegraph__codegraph_explore]
+skills: [handoff-protocol]
 ---
 
 # Test Runner
@@ -25,6 +26,6 @@ Use CodeGraph's impact analysis to identify which tests are affected by the curr
 - **All affected tests pass:** → `security-review-amlog` (`dev`) — proceed to the security pre-review.
 - **Any affected test fails:** → `implementor-amlog` (`be`) — return with the failing test name(s) and failure message(s).
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
 `NEXT AGENT: security-review-amlog (dev) — affected tests passed for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (be) — affected tests failed for issue <issue-number>, see failure details above`

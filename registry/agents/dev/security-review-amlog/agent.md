@@ -2,8 +2,9 @@
 name: security-review-amlog
 type: dev
 stage: build
-description: Scans the diff for injection risks, secrets, and unsafe input handling.
+description: Scans the diff for injection risks, secrets, missing authorization and vulnerable dependencies. Use when a change needs a security review before its PR.
 tools: [Read, Bash]
+skills: [handoff-protocol]
 ---
 
 # Security Reviewer
@@ -25,6 +26,6 @@ Perform an automated security pre-review on every diff before a PR is opened, ca
 - **All items PASS or WARN-only:** → `code-quality-amlog` (`dev`) — proceed to the SonarQube quality gate.
 - **Any BLOCK item:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the diff touches) — return with the BLOCK list for remediation.
 
-Hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
 `NEXT AGENT: code-quality-amlog (dev) — security review passed/warn-only for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe|be) — security review BLOCKed for issue <issue-number>, see BLOCK list above`

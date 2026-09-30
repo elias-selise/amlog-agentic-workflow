@@ -2,7 +2,7 @@
 name: knowledge-base-setup
 type: dev
 stage: platform
-description: Installs and initializes CodeGraph for the workspace knowledge graph.
+description: Installs and initializes CodeGraph for the workspace knowledge graph. Use when CodeGraph is missing or not indexed, or a new zone was added.
 tools: [Bash, Read]
 ---
 

@@ -2,8 +2,9 @@
 name: test-executor-amlog
 type: qa
 stage: qa
-description: Runs the full test suite and reports a verdict that gates PR merge approval.
+description: Runs the full test suite and reports a verdict that gates PR merge approval. Use when asked to run all tests or for a QA verdict.
 tools: [Read, Bash]
+skills: [handoff-protocol]
 ---
 
 # Test Executor
@@ -32,7 +33,7 @@ Execute the complete test suite across both frontend and backend, producing a de
 - **Verdict `rejected`, hard failure:** → `implementor-amlog` (`fe` or `be`, matching whichever codebase the failure is in) — return with the failure report.
 - **Verdict `rejected`, coverage below floor only (no hard failure):** → `test-generator-amlog` (`qa`) — return with the coverage report so more tests can close the gap.
 
-Hand off the moment a verdict is reached — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line(s) so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment a verdict is reached — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line(s) so the next step is never left implicit:
 `NEXT AGENT: github-manager-amlog (dev) — QA verdict <accepted|accepted-with-open-items> for issue <issue-number>`
 `NEXT AGENT: test-generator-amlog (qa) — QA verdict rejected (coverage/flaky) for issue <issue-number>`
 `NEXT AGENT: implementor-amlog (fe|be) — QA verdict rejected (hard failure) for issue <issue-number>`

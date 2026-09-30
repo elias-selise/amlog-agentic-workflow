@@ -6,6 +6,7 @@ const chalk = require('chalk');
 const { parseFrontmatter, rewriteScriptPaths } = require('./frontmatter');
 const { getAdapter } = require('./adapters');
 const { mergeState, readState, writeState } = require('./state');
+const { syncRouterSections, removeRouterSections } = require('./router');
 
 const REGISTRY_DIR = path.join(__dirname, '../../registry');
 const SKILLS_DIR = path.join(REGISTRY_DIR, 'skills');
@@ -101,7 +102,10 @@ async function installAgents(agents, tools, workspaceDir, allAgents = agents) {
     }
   }
 
-  mergeState(workspaceDir, stateRecords);
+  const { installs } = mergeState(workspaceDir, stateRecords);
+  // Refresh the routing section so the main session knows every installed
+  // agent (and picks one without the user naming it).
+  syncRouterSections(workspaceDir, installs);
   return results;
 }
 
@@ -122,6 +126,7 @@ async function uninstallAgents(workspaceDir) {
     }
   }
   writeState(workspaceDir, []);
+  removeRouterSections(workspaceDir);
   return installs;
 }
 

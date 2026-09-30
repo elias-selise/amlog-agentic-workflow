@@ -106,6 +106,7 @@ amlog uninstall [flags]        Remove agents (and optionally the KB) from this w
 amlog upgrade [version]        Update the amlog CLI itself
 amlog list                     Show every agent in the registry, with type/stage
 amlog status                   Show what's installed in the current workspace + CodeGraph index status
+amlog handoff <action>         Agent handoff loop guard: check | record | reset | status (Section 8)
 amlog version                  Print installed CLI version
 ```
 
@@ -116,6 +117,7 @@ amlog version                  Print installed CLI version
 | `--yes` | skip prompts | `install`, `uninstall` |
 | `--location` | `global` \| `local` | `install` — where the CLI's own config lives, same meaning as CodeGraph's flag |
 | `--keep-knowledge-base` | boolean | `uninstall` |
+| `--auto-handover` / `--no-auto-handover` | boolean | `install`: writes `auto_handover` to `amlog-workflow.config.json` (Section 11) |
 
 ---
 
@@ -242,9 +244,9 @@ all agents so `amlog list` and any orchestrator can parse it uniformly:
 name: implementor-amlog
 type: fe
 stage: build
-description: One sentence, third person, describing what this agent does.
+description: One sentence, third person, describing what this agent does. Use when <the user intent that should route here>.
 tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
-skills: [angular]
+skills: [angular, handoff-protocol]
 ---
 
 # <Title>
@@ -267,13 +269,42 @@ section follows this shape:
 - **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
 - **<condition>:** → `<next-agent-name>` (`<type>`) — <short reason/artifact>.
 
-Hand off the moment a condition above is met — don't wait to be re-prompted,
-and don't just narrate the handoff. If your tool can invoke another
-agent/subagent directly, do that now. If it can't, end your final message
-with one line per handoff, exactly as shown, so the next step is never left
-implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop
+guard + `auto_handover`). Once it clears the handoff, hand off the moment a
+condition above is met — don't wait to be re-prompted, and don't just narrate
+it. If your tool can invoke another agent/subagent directly, do that now. If
+it can't, end your final message with one line per handoff, exactly as shown,
+so the next step is never left implicit:
 `NEXT AGENT: <next-agent-name> (<type>) — <reason>`
 ```
+
+**Every handoff goes through the shared `handoff-protocol` skill**
+(`registry/skills/handoff-protocol/SKILL.md`, listed in every handing-off
+agent's `skills:`). Keeping it in one skill instead of 15 copies means one
+place to change. It defines:
+- **Loop guard:** each handoff is logged to `.amlog/handoffs/<issue>.log`.
+  When the same `from -> to` handoff for the same issue would happen for the
+  `max_handoff_repeats`-th time (default 3), the chain stops with
+  `HUMAN INPUT REQUIRED: loop limit …`, whatever `auto_handover` says.
+  `amlog handoff check|record` makes the count deterministic. Agents without
+  a shell read and append the log by hand, using the same rules.
+- **`auto_handover`:** `true` hands off with no confirmation. `false`
+  (the default) asks the user before each handoff.
+- **Mandatory human gates** that `auto_handover` never skips: AC + story
+  confirmation, the instructions file, plan review, visual verification,
+  tester edge cases, and commit/PR approval. At a gate the agent ends with
+  `HUMAN INPUT REQUIRED: <gate> — <what it needs>`.
+- **Who records:** only the party that actually starts the next agent. A
+  subagent that can't invoke another agent just emits `NEXT AGENT:`, and the
+  orchestrating session applies the protocol.
+
+**Routing.** The `description` "Use when…" clause and the manifest's
+`triggers` field (one line per agent, `registry/manifest.json`) feed a
+routing section (`registry/router/ROUTER.md` template) that install/update
+writes, marker-fenced, into each installed tool's always-loaded instruction
+file (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex/OpenCode/
+Antigravity). The main session then picks the agent from the user's prompt
+without the agent being named. Uninstall strips the section again.
 
 This exists because not every tool auto-chains agents the same way: Claude
 Code and OpenCode can invoke a project subagent directly, but Codex's
@@ -442,9 +473,14 @@ a workspace that doesn't have one yet:
     "database": "./database"
   },
   "businessDocs": "./docs/business",
-  "output": "./.knowledge-graph"
+  "output": "./.knowledge-graph",
+  "auto_handover": false,
+  "max_handoff_repeats": 3
 }
 ```
+
+`auto_handover` and `max_handoff_repeats` drive the handoff protocol
+(Section 8). Both are optional and default to `false` / `3` when missing.
 
 ---
 
