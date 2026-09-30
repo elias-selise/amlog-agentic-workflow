@@ -19,7 +19,7 @@ const WORKSPACE = process.cwd();
 const TOOL_CHOICES = TOOL_IDS.map((id) => ({ title: getAdapter(id).label, value: id }));
 
 /**
- * Set `auto_handover` in amlog-workflow.config.json: from --auto-handover /
+ * Set `auto_handover` in .amlog/amlog-workflow.config.json: from --auto-handover /
  * --no-auto-handover if given, otherwise ask once. An existing value is kept
  * unless a flag overrides it; with no flag and no prompt, nothing is written
  * and agents fall back to the default (ask before each handoff).
@@ -65,7 +65,7 @@ const CONFIG_DEFAULTS = {
 };
 
 /**
- * Create amlog-workflow.config.json with defaults, or add any missing default
+ * Create .amlog/amlog-workflow.config.json with defaults, or add any missing default
  * keys to an existing one. Existing values are never overwritten.
  *
  * @param {string} workspaceDir

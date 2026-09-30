@@ -246,7 +246,7 @@ function wireCodegraph(targetTools = []) {
 }
 
 /**
- * Read zones from amlog-workflow.config.json, or return ['.'] as fallback.
+ * Read zones from .amlog/amlog-workflow.config.json, or return ['.'] as fallback.
  *
  * @param {string} workspaceDir
  * @returns {string[]}
@@ -305,7 +305,7 @@ function printZoneStatus(zones, workspaceDir) {
 /**
  * Re-index configured zones and print status, without touching CodeGraph's own
  * install/wiring. Used by `amlog update` so zones added to
- * amlog-workflow.config.json after initial install get indexed without a full
+ * .amlog/amlog-workflow.config.json after initial install get indexed without a full
  * uninstall/reinstall.
  *
  * @param {string} workspaceDir

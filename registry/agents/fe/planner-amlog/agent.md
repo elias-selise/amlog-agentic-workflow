@@ -21,8 +21,8 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
 6. Following the skill's planning guidance, identify affected/new components, services, and modules; define the API data flow; and identify any shared state changes required.
 7. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
 8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
-9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End the message that asks with `HUMAN INPUT REQUIRED: plan review — docs/<issue-number>/plan.md`.
-10. In the same message as the plan review (step 9), also ask whether they want further research on this plan, so it doesn't cost an extra round trip. If they do, invoke `researcher-amlog` to research the plan independently.
+9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete.
+10. After the plan is confirmed, ask the user if they need further research on this plan; if they do, invoke `researcher-amlog` to independently research on the plan.
 11. Append a new entry to `.amlog/history/planner-amlog-fe.md` for this issue:
    ```
    ## Issue <issue-number> — <date>
