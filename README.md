@@ -301,7 +301,7 @@ and check `amlog status` for a full breakdown of what's actually recorded as ins
 
 ## Multi-zone repos (frontend + backend in one repo)
 
-Add an `amlog-workflow.config.json` at your repo root to tell amlog (and CodeGraph) how to index each zone independently:
+`amlog install` creates an `amlog-workflow.config.json` at your repo root for every install (existing values are kept; only missing keys are added). Edit its `zones` to tell amlog (and CodeGraph) how to index each zone independently:
 
 ```json
 {
@@ -316,13 +316,7 @@ Add an `amlog-workflow.config.json` at your repo root to tell amlog (and CodeGra
 }
 ```
 
-Copy the example file to get started:
-
-```bash
-cp node_modules/amlog-workflow/amlog-workflow.config.example.json ./amlog-workflow.config.json
-```
-
-If you don't create this file, `amlog install` will detect a plausible multi-zone layout on its own (when it finds ≥2 candidate zone directories) and offer to write one for you interactively.
+A single-project install gets `"zones": {}`, which indexes the repo root. When `amlog install` finds ≥2 candidate zone directories, it offers to fill `zones` in for you interactively. A full sample is copied to `amlog-workflow.config.example.json` in your repo root on every install; copy zones from it as needed.
 
 ---
 

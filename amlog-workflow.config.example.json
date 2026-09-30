@@ -3,10 +3,10 @@
   "zones": {
     "frontend": "./frontend",
     "backend": "./backend",
-    "database": "./database"
+    "database": "./database",
+    "qa": "/e2e-full-cycle/"
   },
   "businessDocs": "./docs/business",
-  "output": "./.knowledge-graph",
   "auto_handover": false,
   "max_handoff_repeats": 3
 }
