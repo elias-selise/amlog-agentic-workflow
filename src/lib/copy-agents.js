@@ -23,7 +23,7 @@ const SKILLS_DIR = path.join(REGISTRY_DIR, 'skills');
  */
 function resolveFileBase(agents, agent) {
   const sameName = agents.filter((a) => a.name === agent.name);
-  return sameName.length > 1 ? `${agent.name}--${agent.type}` : agent.name;
+  return sameName.length > 1 ? `${agent.name}-${agent.type}` : agent.name;
 }
 
 /**
@@ -53,6 +53,23 @@ async function copySkills(skillIds, workspaceDir) {
     if (!fs.existsSync(skillSrc)) continue;
     const skillDest = path.join(workspaceDir, '.amlog', 'skills', skillId);
     await fs.copy(skillSrc, skillDest, { overwrite: true });
+  }
+}
+
+// Earlier releases named collision-suffixed agents `<name>--<type>`; the
+// separator is now a single dash. Clear the old file and carry the history over.
+async function removeRenamedInstall(adapter, toolId, agent, fileBase, workspaceDir) {
+  const prev = readState(workspaceDir).installs.find(
+    (r) => r.tool === toolId && r.type === agent.type && r.name === agent.name,
+  );
+  if (prev && prev.fileBase !== fileBase) await adapter.remove(prev.fileBase, workspaceDir);
+}
+
+async function renameLegacyHistory(workspaceDir, agent, fileBase) {
+  const legacy = path.join(workspaceDir, '.amlog', 'history', `${agent.name}--${agent.type}.md`);
+  const current = path.join(workspaceDir, '.amlog', 'history', `${fileBase}.md`);
+  if (fileBase !== agent.name && fs.existsSync(legacy) && !fs.existsSync(current)) {
+    await fs.move(legacy, current);
   }
 }
 
@@ -87,10 +104,12 @@ async function installAgents(agents, tools, workspaceDir, allAgents = agents) {
     }
 
     const fileBase = resolveFileBase(allAgents, agent);
+    await renameLegacyHistory(workspaceDir, agent, fileBase);
 
     for (const toolId of tools) {
       try {
         const adapter = getAdapter(toolId);
+        await removeRenamedInstall(adapter, toolId, agent, fileBase, workspaceDir);
         const dest = await adapter.write(fileBase, meta, body, workspaceDir);
         await copyScripts(agent, workspaceDir);
         await copySkills(meta.skills, workspaceDir);

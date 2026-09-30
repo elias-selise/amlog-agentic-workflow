@@ -3,7 +3,9 @@
 # This script is the shell equivalent of src/lib/knowledge-base.js.
 set -euo pipefail
 
-CONFIG_FILE="amlog-workflow.config.json"
+CONFIG_FILE=".amlog/amlog-workflow.config.json"
+# Pre-.amlog/ installs kept the config at the repo root.
+[ -f "$CONFIG_FILE" ] || { [ -f "amlog-workflow.config.json" ] && CONFIG_FILE="amlog-workflow.config.json"; }
 REPO_ROOT="$(pwd)"
 
 log() { echo "[kb-setup] $*"; }
@@ -34,13 +36,14 @@ if [ -f "$CONFIG_FILE" ]; then
   log "Found $CONFIG_FILE — reading zones..."
   if command -v jq >/dev/null 2>&1; then
     while IFS= read -r p; do ZONE_PATHS+=("$p"); done \
-      < <(jq -r '.zones // {} | to_entries[] | .value' "$CONFIG_FILE")
+      < <(jq -r '.zones // {} | to_entries[] | .value | select(. != null and . != "")' "$CONFIG_FILE")
   else
     while IFS= read -r p; do ZONE_PATHS+=("$p"); done \
       < <(python3 -c "
 import json
 with open('$CONFIG_FILE') as f: cfg = json.load(f)
-for v in cfg.get('zones', {}).values(): print(v)
+for v in cfg.get('zones', {}).values():
+    if v: print(v)
 ")
   fi
 else

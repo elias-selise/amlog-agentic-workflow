@@ -43,7 +43,7 @@ function logPath(workspaceDir, issue) {
 function normalizeAgent(ref) {
   const raw = String(ref || '').trim();
   if (raw === ANY) return ANY;
-  const m = /^([\w.-]+?)(?:--([\w-]+))?\s*(?:[/:]\s*([\w-]+)|\(\s*([\w|-]+)\s*\))?$/.exec(raw);
+  const m = /^([\w.-]+?)(?:--?(fe|be|qa|ba|dev))?\s*(?:[/:]\s*([\w-]+)|\(\s*([\w|-]+)\s*\))?$/.exec(raw);
   if (!m) throw new Error(`Unrecognized agent reference: "${ref}" (expected <name>/<type>).`);
   const [, name, suffixType, slashType, parenType] = m;
   const type = slashType || parenType || suffixType;

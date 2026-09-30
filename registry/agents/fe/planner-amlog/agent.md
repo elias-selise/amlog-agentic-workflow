@@ -13,7 +13,7 @@ skills: [angular, react, handoff-protocol]
 Translate a user story and AC into a concrete, step-by-step implementation plan by exploring the existing codebase structure and conventions, applying the loaded framework skill.
 
 ## Instructions
-1. Read `.amlog/history/planner-amlog--fe.md` if it exists. Note the `Lesson for next run` line from up to the 5 most recent entries and apply it to this run.
+1. Read `.amlog/history/planner-amlog-fe.md` if it exists. Note the `Lesson for next run` line from up to the 5 most recent entries and apply it to this run.
 2. Read the story file from `docs/<issue-number>/instructions.md` and the research summary from `docs/<issue-number>/research.md` (if available). If it references a Figma file/frame link, use the Figma MCP tools (`mcp__figma`) to pull design context (layout, components, variables/tokens, screenshots) before planning the UI — do not guess at spacing, colors, or component structure that Figma can answer directly.
 3. Detect which frontend framework the target codebase uses — check `package.json` dependencies (`@angular/core` vs. `react`/`react-dom`) or file extensions (`.component.ts` vs. `.tsx`/`.jsx`) — and select the matching skill: `.amlog/skills/angular/SKILL.md` for Angular, `.amlog/skills/react/SKILL.md` for React. If the codebase mixes both or matches neither, ask the user which skill to apply.
 4. Use `codegraph_explore` to understand the relevant module, component, and service structure, and check what you observe against the selected skill file. If the codebase has drifted from what's written there (a new pattern adopted, a documented convention no longer used), update the skill file's relevant bullets in place to match reality — edit additively/correctively, don't remove sections, and if you're not confident a change is real, leave the bullet as-is and just note the discrepancy instead of editing. State in your summary which skill you used and what you updated, or that no update was needed.
@@ -21,9 +21,9 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
 6. Following the skill's planning guidance, identify affected/new components, services, and modules; define the API data flow; and identify any shared state changes required.
 7. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
 8. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
-9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End the message that asks with `HUMAN INPUT REQUIRED: plan review — docs/<issue-number>/plan.md`.
-10. In the same message as the plan review (step 9), also ask whether they want further research on this plan, so it doesn't cost an extra round trip. If they do, invoke `researcher-amlog` to research the plan independently.
-11. Append a new entry to `.amlog/history/planner-amlog--fe.md` for this issue:
+9. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete.
+10. After the plan is confirmed, ask the user if they need further research on this plan; if they do, invoke `researcher-amlog` to independently research on the plan.
+11. Append a new entry to `.amlog/history/planner-amlog-fe.md` for this issue:
    ```
    ## Issue <issue-number> — <date>
    - Planned/attempted: <1-3 bullets>

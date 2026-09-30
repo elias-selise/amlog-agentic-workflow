@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs-extra');
 const chalk = require('chalk');
 const { confirm } = require('./prompt-utils');
+const { CONFIG_FILE, LEGACY_CONFIG_FILE, readWorkflowConfig, activeZones } = require('./workflow-config');
 
-const CONFIG_FILE = 'amlog-workflow.config.json';
 
 // Files whose presence in an immediate subdirectory suggests it's its own
 // sub-project (a plausible separate CodeGraph zone), e.g. a frontend/ dir
@@ -246,14 +246,14 @@ function wireCodegraph(targetTools = []) {
 }
 
 /**
- * Read zones from amlog-workflow.config.json, or return ['.'] as fallback.
+ * Read zones from .amlog/amlog-workflow.config.json, or return ['.'] as fallback.
  *
  * @param {string} workspaceDir
  * @returns {string[]}
  */
 function readZones(workspaceDir) {
-  const configPath = path.join(workspaceDir, CONFIG_FILE);
-  if (!fs.existsSync(configPath)) {
+  const hasConfig = [CONFIG_FILE, LEGACY_CONFIG_FILE].some((f) => fs.existsSync(path.join(workspaceDir, f)));
+  if (!hasConfig) {
     console.log(chalk.yellow(
       `  No ${CONFIG_FILE} found. Indexing repo root as a single zone.\n` +
       `  Tip: add a ${CONFIG_FILE} if this is a multi-zone repo (frontend + backend).`
@@ -261,8 +261,8 @@ function readZones(workspaceDir) {
     return ['.'];
   }
 
-  const cfg = fs.readJsonSync(configPath);
-  const zones = Object.values(cfg.zones || {});
+  const cfg = readWorkflowConfig(workspaceDir);
+  const zones = activeZones(cfg);
   if (zones.length === 0) return ['.'];
   return zones;
 }
@@ -305,7 +305,7 @@ function printZoneStatus(zones, workspaceDir) {
 /**
  * Re-index configured zones and print status, without touching CodeGraph's own
  * install/wiring. Used by `amlog update` so zones added to
- * amlog-workflow.config.json after initial install get indexed without a full
+ * .amlog/amlog-workflow.config.json after initial install get indexed without a full
  * uninstall/reinstall.
  *
  * @param {string} workspaceDir

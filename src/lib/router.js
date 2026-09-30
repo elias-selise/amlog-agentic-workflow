@@ -34,7 +34,7 @@ const INVOKE_HINT = {
   claude: 'invoke the subagent with the Agent tool (`subagent_type` = the agent id).',
   codex: 'spawn the custom agent by name, e.g. "Spawn the `<agent-id>` agent to <task>" (Codex only spawns agents you name).',
   opencode: 'invoke the subagent with the Task tool (`subagent_type` = the agent id).',
-  antigravity: 'delegate to the subagent named by the agent id (`agents/agents/<agent-id>/AGENT.md`).',
+  antigravity: 'delegate to the subagent named by the agent id (`.agents/agents/<agent-id>/AGENT.md`).',
 };
 
 function escapeCell(text) {

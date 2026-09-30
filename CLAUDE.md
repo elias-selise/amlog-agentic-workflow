@@ -18,4 +18,4 @@ Please read @[./AGENTS.md]
 - Enhance the QA Agent to improve test coverage, validation quality, issue detection, and overall reliability.
 
 ### Antigravity Compatibility improvement
-    - Agents are not  recognized automatically by agy cli. We need to follow the `agents/agents/<agent-name>/AGENT.md` rule.
+    - Agents are not  recognized automatically by agy cli. We need to follow the `.agents/agents/<agent-name>/AGENT.md` rule (verified against agy 1.2.13: a bare `agents/agents/` is not discovered).

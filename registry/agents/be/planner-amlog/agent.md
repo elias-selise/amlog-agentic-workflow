@@ -13,7 +13,7 @@ skills: [dotnet, handoff-protocol]
 Translate a user story and AC into a concrete, step-by-step implementation plan by exploring the existing service structure and conventions, applying the loaded framework skill.
 
 ## Instructions
-1. Read `.amlog/history/planner-amlog--be.md` if it exists. Note the `Lesson for next run` line from up to the 5 most recent entries and apply it to this run.
+1. Read `.amlog/history/planner-amlog-be.md` if it exists. Note the `Lesson for next run` line from up to the 5 most recent entries and apply it to this run.
 2. Read the story file from `docs/<issue-number>/instructions.md` and the research summary from `docs/<issue-number>/research.md` (if available).
 3. Use `codegraph_explore` on codebase to understand the project's layered architecture (Controllers, Services, Repositories, DTOs), and check what you observe against `.amlog/skills/dotnet/SKILL.md`. If the codebase has drifted from what's written there (a new pattern adopted, a documented convention no longer used), update the skill file's relevant bullets in place to match reality — edit additively/correctively, don't remove sections, and if you're not confident a change is real, leave the bullet as-is and just note the discrepancy instead of editing. State in your summary what you updated, or that no update was needed.
 4. Read the (now current) `.amlog/skills/dotnet/SKILL.md` and apply its planning guidance for the remaining steps.
@@ -21,7 +21,7 @@ Translate a user story and AC into a concrete, step-by-step implementation plan 
 6. Estimate the implementation in story points or hours, and flag any unknowns or blockers.
 7. Write the plan to `docs/<issue-number>/plan.md` and confirm it covers all AC.
 8. **ALWAYS present the plan to the developer and ask for their input before finalizing** — this is a hard gate, not a formality. Incorporate any changes they request and re-confirm; never hand off to `implementor-amlog` on an unreviewed plan, even if it looks complete. This is a mandatory human gate (see `.amlog/skills/handoff-protocol/SKILL.md`): it applies even when `auto_handover` is `true`. End the message that asks with `HUMAN INPUT REQUIRED: plan review — docs/<issue-number>/plan.md`.
-9. Append a new entry to `.amlog/history/planner-amlog--be.md` for this issue:
+9. Append a new entry to `.amlog/history/planner-amlog-be.md` for this issue:
    ```
    ## Issue <issue-number> — <date>
    - Planned/attempted: <1-3 bullets>

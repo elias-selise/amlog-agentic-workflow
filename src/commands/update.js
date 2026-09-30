@@ -76,7 +76,7 @@ async function runUpdate(opts) {
 
   ensureGitignoreEntries(WORKSPACE);
 
-  // Re-index zones so changes to amlog-workflow.config.json (e.g. a newly added
+  // Re-index zones so changes to .amlog/amlog-workflow.config.json (e.g. a newly added
   // zone) take effect without a full uninstall/reinstall.
   refreshWindowsPath();
   if (isCodegraphInstalled()) {

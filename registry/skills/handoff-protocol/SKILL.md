@@ -11,7 +11,7 @@ This is a process skill. It describes how agents coordinate, not how the codebas
 
 ## 1. Settings
 
-Read `amlog-workflow.config.json` at the workspace root. If the file or a key is missing, use the default.
+Read `.amlog/amlog-workflow.config.json`. If the file or a key is missing, use the default.
 
 | Key | Default | Meaning |
 |---|---|---|
