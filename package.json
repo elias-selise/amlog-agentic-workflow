@@ -1,6 +1,6 @@
 {
   "name": "amlog-workflow",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Agentic SDLC workflow toolkit — installs role-specific AI agents + CodeGraph knowledge base into any workspace.",
   "keywords": [
     "agents",
@@ -29,8 +29,7 @@
     "src/",
     "registry/",
     "install.sh",
-    "install.ps1",
-    "amlog-workflow.config.example.json"
+    "install.ps1"
   ],
   "scripts": {
     "test": "echo 'No tests yet — skipping' && exit 0",

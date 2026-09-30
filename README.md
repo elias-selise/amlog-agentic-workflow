@@ -65,11 +65,11 @@ In short, one command gives your AI coding assistant(s):
 | Claude Code | `--claude` | `.claude/agents/<name>.md` | Markdown + YAML frontmatter |
 | Codex | `--codex` | `.codex/agents/<name>.toml` | TOML |
 | OpenCode | `--opencode` | `.opencode/agent/<name>.md` | Markdown + YAML frontmatter |
-| Antigravity | `--antigravity` | `agents/agents/<name>/AGENT.md` | Markdown + YAML frontmatter |
+| Antigravity | `--antigravity` | `.agents/agents/<name>/AGENT.md` | Markdown + YAML frontmatter |
 
 You can select more than one tool at once (`--claude --codex`), and installing for a new tool later never re-copies or duplicates agents already installed for another — each tool gets its own native files, tracked independently in `.amlog/state.json`.
 
-> **Note on name collisions:** a few agent names (e.g. `planner-amlog`, `implementor-amlog`) exist under more than one role (`fe` and `be`). Because each native tool folder is flat (one file per name), amlog automatically suffixes the installed filename with the role whenever both are selected together — e.g. `planner-amlog--fe.md` and `planner-amlog--be.md` side by side, each with a matching unique `name:` in its frontmatter so the host tool never sees a duplicate. You'll only see the plain `<name>.md` when there's no collision for the roles you installed.
+> **Note on name collisions:** a few agent names (e.g. `planner-amlog`, `implementor-amlog`) exist under more than one role (`fe` and `be`). Because each native tool folder is flat (one file per name), amlog automatically suffixes the installed filename with the role whenever both are selected together — e.g. `planner-amlog-fe.md` and `planner-amlog-be.md` side by side, each with a matching unique `name:` in its frontmatter so the host tool never sees a duplicate. You'll only see the plain `<name>.md` when there's no collision for the roles you installed.
 
 Every install also bootstraps [CodeGraph](https://github.com/colbymchenry/codegraph) so agents have a real, queryable knowledge graph of your codebase from day one.
 
@@ -206,11 +206,11 @@ Installs agents into the current workspace and bootstraps CodeGraph. Any role/to
 | `--claude` | Install native Claude Code subagents (`.claude/agents/`) |
 | `--codex` | Install native Codex subagents (`.codex/agents/`) |
 | `--opencode` | Install native OpenCode subagents (`.opencode/agent/`) |
-| `--antigravity` | Install native Antigravity subagents (`agents/agents/<name>/AGENT.md`) |
+| `--antigravity` | Install native Antigravity subagents (`.agents/agents/<name>/AGENT.md`) |
 | `--tools <csv>` | Explicit tool ids: `claude,codex,opencode,antigravity` |
 | `--yes` | Skip all confirmation/interactive prompts |
 | `--location <scope>` | Where CLI config lives: `global` \| `local` (default: `global`) |
-| `--auto-handover` / `--no-auto-handover` | Write `auto_handover: true` / `false` to `amlog-workflow.config.json` without prompting (see [Handoff automation](#handoff-automation--loop-guard)). Without either flag, install asks once and keeps any value already set. |
+| `--auto-handover` / `--no-auto-handover` | Write `auto_handover: true` / `false` to `.amlog/amlog-workflow.config.json` without prompting (see [Handoff automation](#handoff-automation--loop-guard)). Without either flag, install asks once and keeps any value already set. |
 
 Role flags and tool flags combine freely — e.g. `amlog install --backend --qa --claude --codex` installs both roles for both tools in one pass.
 
@@ -301,7 +301,7 @@ and check `amlog status` for a full breakdown of what's actually recorded as ins
 
 ## Multi-zone repos (frontend + backend in one repo)
 
-`amlog install` creates an `amlog-workflow.config.json` at your repo root for every install (existing values are kept; only missing keys are added). Edit its `zones` to tell amlog (and CodeGraph) how to index each zone independently:
+`amlog install` creates `.amlog/amlog-workflow.config.json` for every install (existing values are kept; only missing keys are added). Edit its `zones` to tell amlog (and CodeGraph) how to index each zone independently:
 
 ```json
 {
@@ -316,7 +316,7 @@ and check `amlog status` for a full breakdown of what's actually recorded as ins
 }
 ```
 
-A single-project install gets `"zones": {}`, which indexes the repo root. When `amlog install` finds ≥2 candidate zone directories, it offers to fill `zones` in for you interactively. A full sample is copied to `amlog-workflow.config.example.json` in your repo root on every install; copy zones from it as needed.
+A fresh install lists `frontend`, `backend`, `database` and `qa` under `zones` (`qa` defaults to `./e2e-full-cycle`, the rest are `null`). Set a path (e.g. `"frontend": "./frontend"`) to enable a zone; `null` zones are ignored, and with none set the repo root is indexed. When `amlog install` finds ≥2 candidate zone directories, it offers to fill `zones` in for you interactively.
 
 ---
 
@@ -381,7 +381,7 @@ codex "spawn implementor-amlog to build this"
 # OpenCode — auto-discovers .opencode/agent/*.md
 opencode run --agent implementor-amlog "..."
 
-# Antigravity — auto-discovers agents/agents/<name>/AGENT.md
+# Antigravity — auto-discovers .agents/agents/<name>/AGENT.md
 agy --agent implementor-amlog "..."
 ```
 
@@ -425,7 +425,7 @@ The routing text itself lives in `registry/router/ROUTER.md`. Edit it there, nev
 
 ## Handoff automation & loop guard
 
-Two settings in `amlog-workflow.config.json` control agent-to-agent handoffs:
+Two settings in `.amlog/amlog-workflow.config.json` control agent-to-agent handoffs:
 
 ```json
 {
@@ -586,7 +586,7 @@ A fourth item is a mandatory *action*, not a confirmation gate: `github-manager-
 
 ## Self-improvement: agent history & retrospectives
 
-`planner-amlog` and `implementor-amlog` (fe and be) each keep a running retrospective log at `.amlog/history/<agent-name>--<type>.md` (gitignored, per-machine):
+`planner-amlog` and `implementor-amlog` (fe and be) each keep a running retrospective log at `.amlog/history/<agent-name>-<type>.md` (gitignored, per-machine):
 
 - **At the start of a run**, the agent reads up to the 5 most recent entries' `Lesson for next run` line and applies it.
 - **At the end of a run**, it appends a new entry — planned/attempted, what actually happened, a codebase pattern learned, and a lesson for next run — condensing anything past the most recent 20 entries into a single archived-lessons block.

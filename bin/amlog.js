@@ -20,7 +20,7 @@ program
   .option('--all', 'Install all agents')
   .option('--target <types>', 'Comma-separated agent types (e.g. fe,qa)')
   .option('--claude', 'Install native Claude Code subagents (.claude/agents/)')
-  .option('--antigravity', 'Install native Antigravity subagents (agents/agents/<name>/AGENT.md)')
+  .option('--antigravity', 'Install native Antigravity subagents (.agents/agents/<name>/AGENT.md)')
   .option('--codex', 'Install native Codex subagents (.codex/agents/)')
   .option('--opencode', 'Install native OpenCode subagents (.opencode/agent/)')
   .option('--tools <ids>', 'Comma-separated tool ids (e.g. claude,codex)')
@@ -93,7 +93,7 @@ program
 // amlog handoff — loop guard agents call before handing work to another agent
 program
   .command('handoff <action>')
-  .description('Agent handoff loop guard: check | record | reset | status (reads auto_handover from amlog-workflow.config.json)')
+  .description('Agent handoff loop guard: check | record | reset | status (reads auto_handover from .amlog/amlog-workflow.config.json)')
   .option('--issue <key>', 'Issue number (or story name before an issue exists)')
   .option('--from <agent>', 'Handing-off agent, as <name>/<type> (e.g. implementor-amlog/be)')
   .option('--to <agent>', 'Receiving agent, as <name>/<type> (e.g. test-runner-amlog/be)')

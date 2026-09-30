@@ -12,7 +12,7 @@ const { bootstrapKnowledgeBase, detectPlausibleZones } = require('../lib/knowled
 const { ensureGitignoreEntries } = require('../lib/gitignore');
 const { runMigration } = require('../lib/migrate');
 const { canPrompt } = require('../lib/prompt-utils');
-const { CONFIG_FILE, readWorkflowConfig, updateWorkflowConfig } = require('../lib/workflow-config');
+const { CONFIG_FILE, LEGACY_CONFIG_FILE, activeZones, readWorkflowConfig, updateWorkflowConfig } = require('../lib/workflow-config');
 
 const WORKSPACE = process.cwd();
 
@@ -49,11 +49,16 @@ async function configureAutoHandover(workspaceDir, opts) {
   console.log(chalk.green(`  ✓ Set auto_handover: ${value} in ${CONFIG_FILE}`));
 }
 
-const CONFIG_EXAMPLE_FILE = 'amlog-workflow.config.example.json';
+// The example file is no longer shipped; earlier installs left copies behind.
+const STALE_EXAMPLE_FILES = [
+  'amlog-workflow.config.example.json',
+  path.join('.amlog', 'amlog-workflow.config.example.json'),
+];
 
 const CONFIG_DEFAULTS = {
   adapter: 'codegraph',
-  zones: {},
+  // null = placeholder for the user to fill in (e.g. "./frontend"); unset zones are ignored
+  zones: { frontend: null, backend: null, database: null, qa: './e2e-full-cycle' },
   businessDocs: './docs/business',
   auto_handover: false,
   max_handoff_repeats: 3,
@@ -66,7 +71,8 @@ const CONFIG_DEFAULTS = {
  * @param {string} workspaceDir
  */
 function ensureWorkflowConfig(workspaceDir) {
-  const existed = fs.existsSync(path.join(workspaceDir, CONFIG_FILE));
+  const existed = fs.existsSync(path.join(workspaceDir, CONFIG_FILE))
+    || fs.existsSync(path.join(workspaceDir, LEGACY_CONFIG_FILE));
   const current = readWorkflowConfig(workspaceDir);
   const missing = Object.keys(CONFIG_DEFAULTS).filter((k) => !(k in current));
   if (existed && missing.length === 0) return;
@@ -77,17 +83,12 @@ function ensureWorkflowConfig(workspaceDir) {
 }
 
 /**
- * Copy the annotated-by-example config into the workspace as a reference
- * (JSON has no comments, so the example doubles as the commented placeholder).
- * Refreshed on every install; the real config is never touched.
+ * Remove example config files written by earlier installs.
  *
  * @param {string} workspaceDir
  */
-function shipConfigExample(workspaceDir) {
-  const src = path.join(__dirname, '..', '..', CONFIG_EXAMPLE_FILE);
-  if (!fs.existsSync(src)) return;
-  fs.copySync(src, path.join(workspaceDir, CONFIG_EXAMPLE_FILE));
-  console.log(chalk.green(`  ✓ Wrote ${CONFIG_EXAMPLE_FILE} (reference)`));
+function removeStaleConfigExamples(workspaceDir) {
+  for (const f of STALE_EXAMPLE_FILES) fs.removeSync(path.join(workspaceDir, f));
 }
 
 /**
@@ -188,7 +189,7 @@ async function runInstall(opts) {
 
   // 5b. Offer to configure multi-zone CodeGraph indexing if this looks like a
   // multi-project repo and no config exists yet
-  if (!readWorkflowConfig(WORKSPACE).zones && canPrompt(opts)) {
+  if (activeZones(readWorkflowConfig(WORKSPACE)).length === 0 && canPrompt(opts)) {
     const candidates = detectPlausibleZones(WORKSPACE);
     if (candidates.length >= 2) {
       const { zones } = await prompts({
@@ -208,7 +209,7 @@ async function runInstall(opts) {
   // 5b'. Ship the config file for every install (not just multi-zone repos);
   // only keys that are missing get filled, so existing settings are kept.
   ensureWorkflowConfig(WORKSPACE);
-  shipConfigExample(WORKSPACE);
+  removeStaleConfigExamples(WORKSPACE);
 
   // 5c. Agent-to-agent handoff mode
   await configureAutoHandover(WORKSPACE, opts);

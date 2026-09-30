@@ -117,7 +117,7 @@ amlog version                  Print installed CLI version
 | `--yes` | skip prompts | `install`, `uninstall` |
 | `--location` | `global` \| `local` | `install` — where the CLI's own config lives, same meaning as CodeGraph's flag |
 | `--keep-knowledge-base` | boolean | `uninstall` |
-| `--auto-handover` / `--no-auto-handover` | boolean | `install`: writes `auto_handover` to `amlog-workflow.config.json` (Section 11) |
+| `--auto-handover` / `--no-auto-handover` | boolean | `install`: writes `auto_handover` to `.amlog/amlog-workflow.config.json` (Section 11) |
 
 ---
 
@@ -167,7 +167,7 @@ CLI can also invoke it directly mid-session.
 2. Run `codegraph install --target=auto --location=global --yes` to wire
    the CodeGraph MCP server into whatever agent CLI(s) are detected in this
    environment.
-3. Look for `amlog-workflow.config.json` at the repo root:
+3. Look for `.amlog/amlog-workflow.config.json`:
    ```json
    {
      "adapter": "codegraph",
@@ -180,7 +180,7 @@ CLI can also invoke it directly mid-session.
      `zones`.
    - If absent, run `codegraph init` once at the repo root as a single
      zone, and print a note suggesting the user add a
-     `amlog-workflow.config.json` if this is a multi-zone repo (front end +
+     `.amlog/amlog-workflow.config.json` if this is a multi-zone repo (front end +
      back end in one repo).
 4. Print `codegraph status` for each indexed zone so the summary shows real
    numbers (files/symbols/edges), not just "done".
@@ -417,7 +417,6 @@ amlog-workflow/
 │       └── qa/
 │           ├── test-generator-amlog/agent.md
 │           └── test-executor-amlog/agent.md + scripts/run-test-suite.sh
-├── amlog-workflow.config.example.json
 └── README.md
 ```
 
@@ -459,21 +458,21 @@ entry.
 
 ---
 
-## 11. `amlog-workflow.config.example.json`
+## 11. `.amlog/amlog-workflow.config.json`
 
-Ship this at the package root so `amlog install` can offer to copy it into
-a workspace that doesn't have one yet:
+`amlog install` creates this file (no separate example is shipped). Zones
+left `null` are placeholders for the user to fill in:
 
 ```json
 {
   "adapter": "codegraph",
   "zones": {
-    "frontend": "./frontend",
-    "backend": "./backend",
-    "database": "./database"
+    "frontend": null,
+    "backend": null,
+    "database": null,
+    "qa": "./e2e-full-cycle"
   },
   "businessDocs": "./docs/business",
-  "output": "./.knowledge-graph",
   "auto_handover": false,
   "max_handoff_repeats": 3
 }

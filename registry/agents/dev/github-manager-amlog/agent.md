@@ -66,9 +66,9 @@ Keeps the task's planning attached to its card so it can be retrieved later for 
     5. Post at most once per issue per session (avoid duplicate comments on retries). Record the outcome (posted or declined) so later triggers don't ask again.
 
 ### Capturing QA/Review Corrections
-- After PR creation (same flow as above), determine which stack(s) issue `<issue-number>` touched: run `git diff --name-only` against the `zones` paths in `amlog-workflow.config.json` if present, otherwise ask me which stack(s) — `fe`, `be`, or both.
+- After PR creation (same flow as above), determine which stack(s) issue `<issue-number>` touched: run `git diff --name-only` against the `zones` paths in `.amlog/amlog-workflow.config.json` if present, otherwise ask me which stack(s) — `fe`, `be`, or both.
 - Check `test-executor-amlog`'s verdict for this cycle:
-  - **`rejected`** or **`accepted-with-open-items`** — for each stack touched, append a correction entry to **both** `.amlog/history/planner-amlog--<type>.md` and `.amlog/history/implementor-amlog--<type>.md`, summarizing what QA/security-review flagged (a hard failure, a flaky suite, a coverage regression, missing security tests) or what security-review feedback required rework:
+  - **`rejected`** or **`accepted-with-open-items`** — for each stack touched, append a correction entry to **both** `.amlog/history/planner-amlog-<type>.md` and `.amlog/history/implementor-amlog-<type>.md`, summarizing what QA/security-review flagged (a hard failure, a flaky suite, a coverage regression, missing security tests) or what security-review feedback required rework:
     ```
     ## Issue <issue-number> — <date> (correction — <verdict>)
     - What actually happened / changed: <what QA/security-review flagged>

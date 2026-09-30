@@ -7,8 +7,10 @@ const { stringifyFrontmatter } = require('../frontmatter');
 const id = 'antigravity';
 const label = 'Antigravity';
 
+// `agy` discovers project agents in `<workspace>/.agents/agents/<name>/AGENT.md`
+// (verified with `agy --agent <name>`; a bare `agents/agents/` is ignored).
 function dir(workspaceDir) {
-  return path.join(workspaceDir, 'agents', 'agents');
+  return path.join(workspaceDir, '.agents', 'agents');
 }
 
 function agentDir(workspaceDir, fileBase) {
@@ -19,10 +21,14 @@ function filePath(workspaceDir, fileBase) {
   return path.join(agentDir(workspaceDir, fileBase), 'AGENT.md');
 }
 
-// Pre-fix installs wrote a flat `.agents/agents/<fileBase>.md` file. Clean up
-// that stale file for this agent so re-installing/updating self-heals it.
-function legacyFlatFilePath(workspaceDir, fileBase) {
-  return path.join(workspaceDir, '.agents', 'agents', `${fileBase}.md`);
+// A previous release wrote to `agents/agents/<fileBase>/` (never discovered by
+// agy). Remove that stale copy for this agent, then drop the folders if empty.
+async function removeLegacy(workspaceDir, fileBase) {
+  const root = path.join(workspaceDir, 'agents');
+  await fs.remove(path.join(root, 'agents', fileBase));
+  for (const d of [path.join(root, 'agents'), root]) {
+    if (fs.existsSync(d) && fs.readdirSync(d).length === 0) await fs.remove(d);
+  }
 }
 
 async function write(fileBase, meta, body, workspaceDir) {
@@ -35,8 +41,7 @@ async function write(fileBase, meta, body, workspaceDir) {
     subagent: true,
   };
 
-  const legacyFlatFile = legacyFlatFilePath(workspaceDir, fileBase);
-  if (fs.existsSync(legacyFlatFile)) await fs.remove(legacyFlatFile);
+  await removeLegacy(workspaceDir, fileBase);
 
   const dest = filePath(workspaceDir, fileBase);
   await fs.outputFile(dest, stringifyFrontmatter(frontmatter, body), 'utf8');
@@ -45,6 +50,7 @@ async function write(fileBase, meta, body, workspaceDir) {
 
 async function remove(fileBase, workspaceDir) {
   await fs.remove(agentDir(workspaceDir, fileBase));
+  await removeLegacy(workspaceDir, fileBase);
 }
 
 function listInstalledNames(workspaceDir) {
