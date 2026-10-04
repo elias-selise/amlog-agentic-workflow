@@ -2,7 +2,7 @@
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
   "description": "Live visualization of which files each AMLOG agent reads and writes — a line-drawn spider crawls your files in real time.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "selise",
   "license": "MIT",
   "repository": {
@@ -26,8 +26,7 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-    "workspaceContains:**/.amlog/activity/events.ndjson",
-    "workspaceContains:**/.amlog/state.json"
+    "onStartupFinished"
   ],
   "contributes": {
     "commands": [
@@ -109,11 +108,14 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package --no-dependencies",
+    "pack:vsix": "npm run compile && node scripts/pack-vsix.js"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.84.0",
-    "typescript": "^5.4.0"
+    "@vscode/vsce": "^2.32.0",
+    "typescript": "^5.4.0",
+    "yazl": "^2.5.1"
   }
 }

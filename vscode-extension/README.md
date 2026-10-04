@@ -66,5 +66,14 @@ cd vscode-extension
 npm install
 npm run compile      # or: npm run watch
 # press F5 in VS Code to launch an Extension Development Host
-npm run package      # build a .vsix (requires @vscode/vsce)
+
+# build an installable .vsix:
+npm run pack:vsix    # reliable across Node versions (uses scripts/pack-vsix.js)
+npm run package      # the standard vsce path (needs Node 20+ for current vsce)
+
+# install the built .vsix:
+code --install-extension amlog-spider-crawler-<version>.vsix
 ```
+
+`pack:vsix` assembles the VSIX (an OPC ZIP) directly, so it works even on a Node
+version too old for the current `@vscode/vsce`.

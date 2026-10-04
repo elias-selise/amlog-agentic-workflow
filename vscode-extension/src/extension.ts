@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { ActivityEvent } from './types';
 import { EventTailer } from './eventTail';
 import { ActivityState } from './activityState';
@@ -21,7 +22,19 @@ export function activate(context: vscode.ExtensionContext): void {
     return;
   }
   const root = folder.uri;
+  const amlogDir = vscode.Uri.joinPath(root, '.amlog');
   const eventsFile = vscode.Uri.joinPath(root, '.amlog', 'activity', 'events.ndjson');
+
+  // The extension activates in every workspace (onStartupFinished) so it is
+  // ready the moment `amlog install` wires the hook — but it should stay silent
+  // in projects that have no AMLOG activity at all.
+  const hasAmlog = () => {
+    try {
+      return fs.existsSync(amlogDir.fsPath);
+    } catch {
+      return false;
+    }
+  };
 
   const state = new ActivityState(config().get<number>('trailLength', 8));
   const decorations = new SpiderDecorations(
@@ -37,6 +50,10 @@ export function activate(context: vscode.ExtensionContext): void {
   statusBar.command = 'amlog.openCrawlMap';
   statusBar.tooltip = 'Open the AMLOG crawl map';
   const refreshStatusBar = () => {
+    if (state.totalFiles() === 0 && !hasAmlog()) {
+      statusBar.hide();
+      return;
+    }
     statusBar.text = `$(bug) ${state.activeAgentCount()} agent(s) · ${state.totalFiles()} file(s)`;
     statusBar.show();
   };
