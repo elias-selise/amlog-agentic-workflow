@@ -135,8 +135,8 @@ export class CodeCrawlPanel {
   </div>
   <div id="viewport">
     <pre id="code"></pre>
-    <div id="spider"></div>
   </div>
+  <canvas id="overlay"></canvas>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;

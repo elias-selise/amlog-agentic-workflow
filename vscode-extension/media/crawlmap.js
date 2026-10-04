@@ -133,14 +133,23 @@
       ctx.lineTo(s.x + r + len, s.y + dy - wiggle * (i % 2 ? 1 : -1));
       ctx.stroke();
     }
-    // body + head
-    ctx.globalAlpha = 0.85;
+    // body + head, with a soft glow
+    ctx.save();
+    ctx.shadowColor = s.color;
+    ctx.shadowBlur = 9;
+    ctx.globalAlpha = 0.9;
     ctx.beginPath();
     ctx.ellipse(s.x, s.y, r * 0.8, r, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
     ctx.arc(s.x, s.y - r, r * 0.45, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
+    // agent label trailing the spider
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = s.color;
+    ctx.font = '10px sans-serif';
+    ctx.fillText(s.label, s.x + r + 6, s.y - r - 2);
     ctx.globalAlpha = 1;
   }
 
@@ -177,12 +186,16 @@
           node.pulse = Math.max(0, node.pulse - 0.03);
           ctx.globalAlpha = 1;
         }
+        ctx.save();
+        ctx.shadowColor = written ? 'rgba(220,120,80,0.8)' : 'rgba(120,160,220,0.8)';
+        ctx.shadowBlur = written ? 8 : 5;
         ctx.fillStyle = written ? 'rgba(220,120,80,0.95)' : 'rgba(120,160,220,0.95)';
         ctx.beginPath();
         ctx.arc(node.x, node.y, size, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         ctx.fillStyle = 'rgba(200,200,200,0.75)';
-        ctx.font = '10px var(--vscode-editor-font-family, monospace)';
+        ctx.font = '10px monospace';
         ctx.fillText(node.label, node.x + size + 3, node.y + 3);
       }
 

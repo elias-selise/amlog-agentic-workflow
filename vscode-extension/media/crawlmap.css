@@ -10,7 +10,10 @@ html, body {
   font-family: var(--vscode-font-family, sans-serif);
   font-size: var(--vscode-font-size, 13px);
   color: var(--vscode-foreground);
-  background: var(--vscode-editor-background);
+  background:
+    radial-gradient(circle at 20% 15%, rgba(120, 160, 220, 0.06) 0, transparent 45%),
+    radial-gradient(circle at 80% 85%, rgba(220, 140, 90, 0.06) 0, transparent 45%),
+    var(--vscode-editor-background);
 }
 
 #toolbar {

@@ -18,11 +18,17 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
 ## What you get
 
 - **Code Crawl** (`AMLOG: Open Code Crawl`): renders the text of the file the
-  active agent is touching and crawls a **line-drawn spider over the actual code
-  lines**. When the event carries a line range (e.g. the agent read lines 1–200
-  or edited 5 lines at line 142), the spider crawls those exact lines; the header
-  shows the same detail the terminal does ("✎ edited 5 line(s) @ line 142"). This
-  is the literal "spider on the file" effect.
+  active agent is touching and crawls an **articulated, line-drawn spider over the
+  actual code lines**, so what you see maps to what the agent is doing:
+  - **Writing** → the spider walks down the edited run, **weaving a silk web**
+    over the lines it writes and *stitching* each line left-to-right with a caret.
+  - **Reading** → it scans the range, sweeping a thin **scan beam** across each
+    line it inspects.
+  - A **status bubble** over the spider says what it's doing ("✎ edited 5 line(s)
+    @ line 142" / "👁 read lines 1–200") — the same detail the terminal shows.
+
+  When the event carries a line range the spider crawls those exact lines. This is
+  the literal "spider on the file" effect.
 - **Crawl Map** (`AMLOG: Open Crawl Map`): a bird's-eye view — files as nodes, an
   animated spider per agent crawling between them with a fading silk trail, a
   legend, a live event ticker, and pause/resume.
