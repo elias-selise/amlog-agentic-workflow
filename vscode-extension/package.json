@@ -32,6 +32,11 @@
         "icon": "$(globe)"
       },
       {
+        "command": "amlog.openCodeCrawl",
+        "title": "AMLOG: Open Code Crawl",
+        "icon": "$(bug)"
+      },
+      {
         "command": "amlog.toggleDecorations",
         "title": "AMLOG: Toggle Spider Decorations"
       },
@@ -53,14 +58,19 @@
     "menus": {
       "view/title": [
         {
+          "command": "amlog.openCodeCrawl",
+          "when": "view == amlogActivity",
+          "group": "navigation@1"
+        },
+        {
           "command": "amlog.openCrawlMap",
           "when": "view == amlogActivity",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "amlog.clearActivity",
           "when": "view == amlogActivity",
-          "group": "navigation"
+          "group": "navigation@3"
         }
       ]
     },

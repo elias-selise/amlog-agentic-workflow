@@ -17,19 +17,30 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
 
 ## What you get
 
+- **Code Crawl** (`AMLOG: Open Code Crawl`): renders the text of the file the
+  active agent is touching and crawls a **line-drawn spider over the actual code
+  lines** — writing walks the spider down a run of lines (editing), reading hops
+  it around (scanning), with per-line read/write highlights. This is the literal
+  "spider on the file" effect.
+- **Crawl Map** (`AMLOG: Open Crawl Map`): a bird's-eye view — files as nodes, an
+  animated spider per agent crawling between them with a fading silk trail, a
+  legend, a live event ticker, and pause/resume.
 - **Gutter spider + line highlight** on any open file an agent just touched,
   colored per agent, fading after a few seconds. *(Command: `AMLOG: Toggle Spider
   Decorations`.)*
-- **Crawl Map** (`AMLOG: Open Crawl Map`): files as nodes, an animated spider per
-  agent crawling between them with a fading silk trail, a legend, a live event
-  ticker, and pause/resume.
 - **AMLOG Activity** explorer view: agents → the files each has read/written.
 - **Status bar**: active agent count and files touched.
 
-> **Note on the editor overlay:** VS Code's editor API can place a gutter glyph +
-> highlight on a file, but cannot free-draw an animated sprite over your code. The
-> smooth crawling animation therefore lives in the Crawl Map webview; the gutter
-> spider is a static per-line glyph that hops between files as events arrive.
+> **Why two webviews rather than drawing on the editor:** VS Code's editor API
+> can only place a gutter glyph + line highlight — it can't free-draw an animated
+> sprite over live code. So the real crawling animation lives in the **Code Crawl**
+> webview, which renders the file's text itself (a read-only view) and animates
+> the spider over those lines. The gutter decoration remains as a lightweight
+> marker inside the real editable editor.
+>
+> *Line targeting:* the capture hook records the file, not the exact line, so the
+> Code Crawl spider animates a plausible "working" pattern over the file rather
+> than the precise edited lines.
 
 ## Settings
 

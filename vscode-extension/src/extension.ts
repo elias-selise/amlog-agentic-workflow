@@ -4,6 +4,7 @@ import { EventTailer } from './eventTail';
 import { ActivityState } from './activityState';
 import { SpiderDecorations } from './decorations';
 import { CrawlMapPanel } from './crawlMap';
+import { CodeCrawlPanel } from './codeCrawl';
 import { ActivityTreeProvider } from './treeView';
 
 // How many recent events to retain so a crawl map opened mid-run can replay the
@@ -29,6 +30,8 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   const backlog: ActivityEvent[] = [];
   let crawlMap: CrawlMapPanel | undefined;
+  let codeCrawl: CodeCrawlPanel | undefined;
+  let lastEvent: ActivityEvent | undefined;
 
   const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   statusBar.command = 'amlog.openCrawlMap';
@@ -51,7 +54,9 @@ export function activate(context: vscode.ExtensionContext): void {
     while (backlog.length > BACKLOG_MAX) {
       backlog.shift();
     }
+    lastEvent = event;
     crawlMap?.post(event);
+    codeCrawl?.post(event);
 
     if (live && event.op === 'write' && config().get<boolean>('autoRevealOnWrite', false)) {
       const uri = vscode.Uri.joinPath(root, event.file);
@@ -72,6 +77,9 @@ export function activate(context: vscode.ExtensionContext): void {
     state,
     vscode.commands.registerCommand('amlog.openCrawlMap', () => {
       crawlMap = CrawlMapPanel.show(context, backlog);
+    }),
+    vscode.commands.registerCommand('amlog.openCodeCrawl', () => {
+      codeCrawl = CodeCrawlPanel.show(context, root, lastEvent);
     }),
     vscode.commands.registerCommand('amlog.toggleDecorations', async () => {
       const next = !config().get<boolean>('showDecorations', true);

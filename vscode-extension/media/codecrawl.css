@@ -1,0 +1,109 @@
+:root {
+  color-scheme: light dark;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: var(--vscode-editor-font-size, 13px);
+  color: var(--vscode-editor-foreground, var(--vscode-foreground));
+  background: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+#header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.25));
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: 12px;
+  z-index: 3;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #888;
+  flex: 0 0 auto;
+}
+
+#agent { font-weight: 600; }
+#op { opacity: 0.9; }
+#file { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; }
+
+#viewport {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+}
+
+#code {
+  margin: 0;
+  padding: 6px 0 40vh 0; /* trailing space so the spider can sit on last lines */
+  counter-reset: line;
+  white-space: pre;
+  tab-size: 4;
+}
+
+.line {
+  display: block;
+  padding: 0 12px 0 56px;
+  position: relative;
+  min-height: 1.4em;
+  line-height: 1.4em;
+}
+
+.line::before {
+  counter-increment: line;
+  content: counter(line);
+  position: absolute;
+  left: 0;
+  width: 44px;
+  text-align: right;
+  opacity: 0.35;
+  user-select: none;
+}
+
+.line.read {
+  background: rgba(120, 160, 220, 0.18);
+  transition: background 0.8s ease;
+}
+
+.line.write {
+  background: rgba(220, 140, 80, 0.22);
+  transition: background 0.8s ease;
+}
+
+.line.fade {
+  background: transparent;
+}
+
+#spider {
+  position: absolute;
+  left: 18px;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  transform: translateY(-100px);
+  z-index: 2;
+  will-change: transform;
+}
+
+#spider.hidden { display: none; }
