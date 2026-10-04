@@ -15,6 +15,7 @@ export interface FileState {
   reads: number;
   writes: number;
   agents: Set<string>;
+  lastDetail: string; // e.g. "read lines 1-200", "edited 5 line(s) @ line 42"
 }
 
 // In-memory rollup of the event stream, shared by the tree view, status bar and
@@ -61,6 +62,7 @@ export class ActivityState {
       reads: 0,
       writes: 0,
       agents: new Set<string>(),
+      lastDetail: '',
     };
     if (event.op === 'read') {
       file.reads++;
@@ -68,6 +70,9 @@ export class ActivityState {
       file.writes++;
     }
     file.agents.add(event.agent);
+    if (event.detail) {
+      file.lastDetail = event.detail;
+    }
     this.files.set(event.file, file);
 
     this.changeEmitter.fire();

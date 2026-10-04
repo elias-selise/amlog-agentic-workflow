@@ -77,7 +77,8 @@
     spider.color = ev.color;
 
     const when = (ev.ts || '').slice(11, 19);
-    ticks.unshift(`${when}  ${ev.agent}  ${ev.op === 'write' ? '✎' : '👁'}  ${ev.file}`);
+    const detail = ev.detail ? `  (${ev.detail})` : '';
+    ticks.unshift(`${when}  ${ev.agent}  ${ev.op === 'write' ? '✎' : '👁'}  ${ev.file}${detail}`);
     while (ticks.length > 6) { ticks.pop(); }
     renderTicker();
     renderStats();

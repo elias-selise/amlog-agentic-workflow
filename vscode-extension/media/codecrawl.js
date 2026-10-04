@@ -45,26 +45,50 @@
     return el ? el.offsetTop + el.offsetHeight / 2 - 15 : 0;
   }
 
-  // Build a plausible "working" path for the spider: a write crawls down a run of
-  // consecutive lines (editing), a read hops around (scanning).
-  function planTargets(op) {
+  // Build the spider's path. When the event carries a real line range (from the
+  // hook's tool_input — "read lines 1-200", "edited 5 lines @ 142") the spider
+  // crawls those exact lines; otherwise it animates a plausible working pattern.
+  function planTargets(op, startLine, endLine) {
     if (lineEls.length === 0) {
       return;
     }
     const n = lineEls.length;
-    const start = targets.length ? targets[targets.length - 1] : Math.floor(Math.random() * n);
+    const clamp = (i) => Math.max(0, Math.min(n - 1, i));
     const plan = [];
-    if (op === 'write') {
-      let line = Math.min(start, n - 1);
-      const run = 4 + Math.floor(Math.random() * 5);
-      for (let i = 0; i < run; i++) {
-        line = Math.min(n - 1, line + 1 + Math.floor(Math.random() * 2));
-        plan.push(line);
+
+    const hasRange = Number.isFinite(startLine);
+    const from = hasRange ? clamp(startLine - 1) : 0;
+    const to = hasRange ? clamp((Number.isFinite(endLine) ? endLine : startLine) - 1) : n - 1;
+
+    if (hasRange) {
+      const span = Math.max(1, to - from + 1);
+      if (op === 'write') {
+        // Walk the edited run line by line (cap steps so a huge range stays snappy).
+        const steps = Math.min(span, 40);
+        for (let i = 0; i < steps; i++) {
+          plan.push(clamp(from + Math.round((i * (span - 1)) / Math.max(1, steps - 1))));
+        }
+      } else {
+        // Scan a few evenly-spaced points across the read range.
+        const hops = Math.min(span, 8);
+        for (let i = 0; i < hops; i++) {
+          plan.push(clamp(from + Math.round((i * (span - 1)) / Math.max(1, hops - 1))));
+        }
       }
     } else {
-      const hops = 3 + Math.floor(Math.random() * 4);
-      for (let i = 0; i < hops; i++) {
-        plan.push(Math.floor(Math.random() * n));
+      const start = targets.length ? targets[targets.length - 1] : Math.floor(Math.random() * n);
+      if (op === 'write') {
+        let line = clamp(start);
+        const run = 4 + Math.floor(Math.random() * 5);
+        for (let i = 0; i < run; i++) {
+          line = clamp(line + 1 + Math.floor(Math.random() * 2));
+          plan.push(line);
+        }
+      } else {
+        const hops = 3 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < hops; i++) {
+          plan.push(Math.floor(Math.random() * n));
+        }
       }
     }
     targets = targets.concat(plan);
@@ -125,9 +149,10 @@
     }
   }
 
-  function setHeader(agent, op, file, color) {
+  function setHeader(agent, op, file, color, detail) {
     agentEl.textContent = agent;
-    opEl.textContent = op === 'write' ? '✎ writing' : '👁 reading';
+    const verb = op === 'write' ? '✎' : '👁';
+    opEl.textContent = detail ? `${verb} ${detail}` : (op === 'write' ? '✎ writing' : '👁 reading');
     fileEl.textContent = file;
     dotEl.style.background = color;
   }
@@ -141,17 +166,18 @@
       currentOp = msg.op;
       currentColor = msg.color;
       setSpiderColor(msg.color);
-      setHeader(msg.agent, msg.op, msg.file, msg.color);
+      setHeader(msg.agent, msg.op, msg.file, msg.color, msg.detail);
       renderFile(msg.lines);
       targets = [];
-      curY = aimY = lineTop(0);
-      planTargets(msg.op);
+      const first = Number.isFinite(msg.startLine) ? Math.max(0, msg.startLine - 1) : 0;
+      curY = aimY = lineTop(Math.min(first, lineEls.length - 1));
+      planTargets(msg.op, msg.startLine, msg.endLine);
     } else if (msg.type === 'touch') {
       currentOp = msg.op;
       currentColor = msg.color;
       setSpiderColor(msg.color);
-      setHeader(msg.agent, msg.op, msg.file + (lineEls.length ? '' : '  (not shown)'), msg.color);
-      planTargets(msg.op);
+      setHeader(msg.agent, msg.op, msg.file + (lineEls.length ? '' : '  (not shown)'), msg.color, msg.detail);
+      planTargets(msg.op, msg.startLine, msg.endLine);
     }
   });
 

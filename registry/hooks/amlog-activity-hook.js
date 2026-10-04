@@ -32,6 +32,80 @@ const OP_BY_TOOL = {
   NotebookEdit: 'write',
 };
 
+// Only search inside a file (to locate an Edit's line) when it is small enough
+// that reading it can't slow the tool call down noticeably.
+const MAX_LOCATE_BYTES = 1024 * 1024;
+
+function countLines(text) {
+  if (typeof text !== 'string' || text === '') return 0;
+  return text.split(/\r?\n/).length;
+}
+
+// 1-based line number where `needle` first appears in the file at `absPath`,
+// or undefined if the file is unreadable / too big / the text isn't found.
+// Best-effort and fully guarded — never throws.
+function locateLine(absPath, needle) {
+  if (typeof needle !== 'string' || !needle) return undefined;
+  try {
+    if (fs.statSync(absPath).size > MAX_LOCATE_BYTES) return undefined;
+    const text = fs.readFileSync(absPath, 'utf8');
+    const idx = text.indexOf(needle.split(/\r?\n/)[0]);
+    if (idx < 0) return undefined;
+    return text.slice(0, idx).split(/\r?\n/).length;
+  } catch {
+    return undefined;
+  }
+}
+
+// Derive the line range / size of a tool call from its input — the same facts
+// the terminal shows ("read lines 1-200", "wrote 40 lines", "edited 5 lines").
+// Returns { startLine?, endLine?, lines?, detail }. Always safe.
+function describeRange(toolName, toolInput, absPath) {
+  try {
+    if (toolName === 'Read') {
+      const offset = Number(toolInput.offset);
+      const limit = Number(toolInput.limit);
+      const startLine = Number.isFinite(offset) && offset > 0 ? offset : 1;
+      if (Number.isFinite(limit) && limit > 0) {
+        const endLine = startLine + limit - 1;
+        const detail = startLine > 1 ? `read lines ${startLine}-${endLine}` : `read first ${limit} lines`;
+        return { startLine, endLine, lines: limit, detail };
+      }
+      return { startLine, detail: startLine > 1 ? `read from line ${startLine}` : 'read whole file' };
+    }
+
+    if (toolName === 'Write') {
+      const lines = countLines(toolInput.content);
+      return { startLine: 1, endLine: lines || undefined, lines, detail: `wrote ${lines} line(s)` };
+    }
+
+    if (toolName === 'Edit') {
+      const lines = countLines(toolInput.new_string);
+      const startLine = locateLine(absPath, toolInput.new_string) || locateLine(absPath, toolInput.old_string);
+      const endLine = startLine && lines ? startLine + lines - 1 : undefined;
+      const where = startLine ? ` @ line ${startLine}` : '';
+      return { startLine, endLine, lines, detail: `edited ${lines} line(s)${where}` };
+    }
+
+    if (toolName === 'MultiEdit') {
+      const edits = Array.isArray(toolInput.edits) ? toolInput.edits : [];
+      const lines = edits.reduce((n, e) => n + countLines(e && e.new_string), 0);
+      const startLine = edits.length ? locateLine(absPath, edits[0].new_string) : undefined;
+      const endLine = startLine && lines ? startLine + lines - 1 : undefined;
+      return { startLine, endLine, lines, detail: `${edits.length} edit(s), ${lines} line(s)` };
+    }
+
+    if (toolName === 'NotebookEdit') {
+      const mode = typeof toolInput.edit_mode === 'string' ? toolInput.edit_mode : 'edit';
+      const cell = toolInput.cell_id ? ` cell ${toolInput.cell_id}` : '';
+      return { detail: `notebook ${mode}${cell}` };
+    }
+  } catch {
+    // fall through to the empty descriptor
+  }
+  return { detail: '' };
+}
+
 function readStdin() {
   return new Promise((resolve) => {
     let data = '';
@@ -91,10 +165,11 @@ async function main() {
   // project dir); fall back to the process cwd.
   const workspaceDir = (typeof input.cwd === 'string' && input.cwd) || process.cwd();
 
+  let absPath = filePath;
   let relFile = filePath;
   try {
-    const abs = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceDir, filePath);
-    relFile = path.relative(workspaceDir, abs) || path.basename(abs);
+    absPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceDir, filePath);
+    relFile = path.relative(workspaceDir, absPath) || path.basename(absPath);
   } catch {
     // Keep the raw path if resolution fails.
   }
@@ -105,6 +180,9 @@ async function main() {
   const agent = pick(input, ['agent_type']) || 'main';
   const agentId = pick(input, ['agent_id']) || '';
 
+  // Line range / size — the same facts the terminal prints for each tool call.
+  const range = describeRange(toolName, toolInput, absPath);
+
   const event = {
     ts: new Date().toISOString(),
     op,
@@ -112,6 +190,10 @@ async function main() {
     agent,
     agentId,
     tool: toolName,
+    startLine: range.startLine,
+    endLine: range.endLine,
+    lines: range.lines,
+    detail: range.detail,
     session: pick(input, ['session_id']) || '',
     toolUseId: pick(input, ['tool_use_id']) || '',
   };

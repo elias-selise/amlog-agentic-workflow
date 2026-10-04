@@ -30,9 +30,14 @@ export class ActivityTreeProvider implements vscode.TreeDataProvider<Node> {
     const base = node.file.split('/').pop() ?? node.file;
     const file = this.state.getFiles().find((f) => f.file === node.file);
     const item = new vscode.TreeItem(base, vscode.TreeItemCollapsibleState.None);
-    item.description = node.file;
     item.resourceUri = vscode.Uri.joinPath(this.workspaceRoot, node.file);
-    item.tooltip = file ? `${node.file}\n${file.reads} read(s), ${file.writes} write(s)` : node.file;
+    if (file) {
+      item.description = file.lastDetail || node.file;
+      item.tooltip = `${node.file}\n${file.reads} read(s), ${file.writes} write(s)`
+        + (file.lastDetail ? `\nlast: ${file.lastDetail}` : '');
+    } else {
+      item.tooltip = node.file;
+    }
     item.iconPath = file && file.writes > 0 ? new vscode.ThemeIcon('pencil') : new vscode.ThemeIcon('eye');
     item.command = {
       command: 'vscode.open',

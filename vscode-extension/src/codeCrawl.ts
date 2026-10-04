@@ -67,7 +67,15 @@ export class CodeCrawlPanel {
       return;
     }
     const color = colorForAgent(event.agent);
-    const header = { file: event.file, agent: event.agent, op: event.op, color };
+    const header = {
+      file: event.file,
+      agent: event.agent,
+      op: event.op,
+      color,
+      startLine: event.startLine,
+      endLine: event.endLine,
+      detail: event.detail,
+    };
 
     if (event.file === this.shownFile) {
       // Same file: just re-trigger the crawl, no need to resend the text.
