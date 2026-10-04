@@ -10,6 +10,17 @@
   const statsEl = document.getElementById('stats');
   const tickerEl = document.getElementById('ticker');
   const toggleBtn = document.getElementById('toggle');
+  const zoomLevelEl = document.getElementById('zoom-level');
+  const recapEl = document.getElementById('recap');
+  const recapBody = document.getElementById('recap-body');
+
+  // pan / zoom of the map (world -> screen: screen = world * view + pan)
+  let view = 1;
+  let panX = 0;
+  let panY = 0;
+  /** @type {{agent:string,color:string,op:string,file:string,detail:string,when:string}[]} */
+  const flow = [];
+  let recapVisible = false;
 
   /** @type {Map<string, {x:number,y:number,label:string,reads:number,writes:number,pulse:number}>} */
   const nodes = new Map();
@@ -80,8 +91,59 @@
     const detail = ev.detail ? `  (${ev.detail})` : '';
     ticks.unshift(`${when}  ${ev.agent}  ${ev.op === 'write' ? '✎' : '👁'}  ${ev.file}${detail}`);
     while (ticks.length > 6) { ticks.pop(); }
+
+    flow.push({ agent: ev.agent, color: ev.color, op: ev.op, file: ev.file, detail: ev.detail || '', when });
+    while (flow.length > 400) { flow.shift(); }
+
     renderTicker();
     renderStats();
+    if (recapVisible) { renderRecap(); }
+  }
+
+  // A per-agent ordered recap of the flow: what each agent read/wrote, in order.
+  function renderRecap() {
+    const byAgent = new Map();
+    for (const step of flow) {
+      if (!byAgent.has(step.agent)) { byAgent.set(step.agent, { color: step.color, steps: [] }); }
+      byAgent.get(step.agent).steps.push(step);
+    }
+    recapBody.innerHTML = '';
+    if (byAgent.size === 0) {
+      const none = document.createElement('div');
+      none.style.opacity = '0.6';
+      none.textContent = 'No activity yet.';
+      recapBody.appendChild(none);
+      return;
+    }
+    for (const [agent, info] of byAgent) {
+      const group = document.createElement('div');
+      group.className = 'recap-agent';
+      const name = document.createElement('div');
+      name.className = 'recap-agent-name';
+      const dot = document.createElement('span');
+      dot.className = 'legend-dot';
+      dot.style.background = info.color;
+      const label = document.createElement('span');
+      label.textContent = `${agent} · ${info.steps.length} step(s)`;
+      name.appendChild(dot);
+      name.appendChild(label);
+      group.appendChild(name);
+      // show the most recent ~18 steps for this agent
+      for (const step of info.steps.slice(-18)) {
+        const row = document.createElement('div');
+        row.className = 'recap-step';
+        const icon = document.createElement('span');
+        icon.className = step.op === 'write' ? 'op-w' : 'op-r';
+        icon.textContent = step.op === 'write' ? '✎' : '👁';
+        const text = document.createElement('span');
+        const base = step.file.split('/').pop() || step.file;
+        text.textContent = step.detail ? `${base} — ${step.detail}` : base;
+        row.appendChild(icon);
+        row.appendChild(text);
+        group.appendChild(row);
+      }
+      recapBody.appendChild(group);
+    }
   }
 
   function renderLegend() {
@@ -156,6 +218,9 @@
   function frame() {
     if (!paused) {
       ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      ctx.save();
+      ctx.translate(panX, panY);
+      ctx.scale(view, view);
 
       // fading silk threads
       for (const t of threads) {
@@ -214,6 +279,8 @@
         }
         drawSpider(s);
       }
+
+      ctx.restore();
     }
     requestAnimationFrame(frame);
   }
@@ -228,10 +295,12 @@
       spiders.clear();
       threads.length = 0;
       ticks.length = 0;
+      flow.length = 0;
       placeIndex = 0;
       renderLegend();
       renderTicker();
       renderStats();
+      if (recapVisible) { renderRecap(); }
     }
   });
 
@@ -240,7 +309,47 @@
     toggleBtn.textContent = paused ? '▶ Resume' : '⏸ Pause';
   });
 
+  // ---- zoom / pan ----------------------------------------------------------
+  function setZoomLabel() { zoomLevelEl.textContent = `${Math.round(view * 100)}%`; }
+  function zoomAt(mx, my, factor) {
+    const next = Math.max(0.2, Math.min(5, view * factor));
+    panX = mx - (mx - panX) * (next / view);
+    panY = my - (my - panY) * (next / view);
+    view = next;
+    setZoomLabel();
+  }
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.1 : 1 / 1.1);
+  }, { passive: false });
+
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  canvas.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; });
+  window.addEventListener('mousemove', (e) => {
+    if (!dragging) { return; }
+    panX += e.clientX - lastX;
+    panY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { dragging = false; });
+
+  document.getElementById('zoom-in').addEventListener('click', () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.2));
+  document.getElementById('zoom-out').addEventListener('click', () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.2));
+  document.getElementById('zoom-reset').addEventListener('click', () => { view = 1; panX = 0; panY = 0; setZoomLabel(); });
+
+  document.getElementById('recap-toggle').addEventListener('click', () => {
+    recapVisible = !recapVisible;
+    recapEl.classList.toggle('hidden', !recapVisible);
+    if (recapVisible) { renderRecap(); }
+    resize();
+  });
+
   resize();
+  setZoomLabel();
   renderStats();
   requestAnimationFrame(frame);
   vscode.postMessage({ type: 'ready' });

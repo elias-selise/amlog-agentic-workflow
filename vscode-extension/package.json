@@ -2,7 +2,7 @@
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
   "description": "Live visualization of which files each AMLOG agent reads and writes — a line-drawn spider crawls your files in real time.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "selise",
   "license": "MIT",
   "repository": {

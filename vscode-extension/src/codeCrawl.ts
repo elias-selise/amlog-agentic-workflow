@@ -8,15 +8,34 @@ import { colorForAgent } from './palette';
 const MAX_LINES = 1200;
 const MAX_BYTES = 512 * 1024;
 
-// Owns the single "Code Crawl" webview: it renders the text of the file an agent
-// is currently touching and crawls a line-drawn spider over the actual code
-// lines. This is the "spider on the file" effect without the editor-overlay
-// limit — the webview renders the code itself, so we fully control the canvas.
+// How many files can be "crawled" at once (a grid of panes), and how long a
+// pane lingers after its file's last event before it is dropped.
+const MAX_PANES = 4;
+const PANE_TTL_MS = 6000;
+
+interface PaneState {
+  file: string;
+  agent: string;
+  op: 'read' | 'write';
+  color: string;
+  startLine?: number;
+  endLine?: number;
+  detail: string;
+  lastSeen: number;
+  sentMtime: number; // mtime whose content we last shipped (-1 = none sent)
+}
+
+// Owns the single "Code Crawl" webview. When one file is active it fills the
+// view; when several files are touched close together it splits into a grid of
+// panes, each with its own spider working that file. The webview renders the
+// code itself, so the animation isn't bound by the editor-decoration limit.
 export class CodeCrawlPanel {
   private static current: CodeCrawlPanel | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private ready = false;
-  private shownFile: string | undefined;
+  private readonly panes = new Map<string, PaneState>();
+  private pending?: ActivityEvent;
+  private sweepTimer?: ReturnType<typeof setInterval>;
 
   static show(context: vscode.ExtensionContext, root: vscode.Uri, last?: ActivityEvent): CodeCrawlPanel {
     const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
@@ -42,8 +61,9 @@ export class CodeCrawlPanel {
     private readonly panel: vscode.WebviewPanel,
     context: vscode.ExtensionContext,
     private readonly root: vscode.Uri,
-    private pending?: ActivityEvent,
+    last?: ActivityEvent,
   ) {
+    this.pending = last;
     this.panel.webview.html = this.html(context.extensionUri);
     this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
     this.panel.webview.onDidReceiveMessage(
@@ -59,41 +79,100 @@ export class CodeCrawlPanel {
       null,
       this.disposables,
     );
+
+    // Expire quiet panes even when no new events arrive to drive pruning.
+    this.sweepTimer = setInterval(() => {
+      if (!this.ready || this.panes.size === 0) {
+        return;
+      }
+      const before = this.panes.size;
+      this.prune(Date.now());
+      if (this.panes.size !== before) {
+        this.sendPanes();
+      }
+    }, 1500);
   }
 
   post(event: ActivityEvent): void {
     if (!this.ready) {
-      this.pending = event; // show the latest once the webview reports ready
+      this.pending = event; // replay the latest once the webview reports ready
       return;
     }
-    const color = colorForAgent(event.agent);
-    const header = {
+
+    const now = Date.now();
+    const existing = this.panes.get(event.file);
+    const pane: PaneState = existing ?? {
       file: event.file,
       agent: event.agent,
       op: event.op,
-      color,
-      startLine: event.startLine,
-      endLine: event.endLine,
-      detail: event.detail,
+      color: colorForAgent(event.agent),
+      detail: event.detail || '',
+      lastSeen: now,
+      sentMtime: -1,
     };
+    pane.agent = event.agent;
+    pane.op = event.op;
+    pane.color = colorForAgent(event.agent);
+    pane.startLine = event.startLine;
+    pane.endLine = event.endLine;
+    pane.detail = event.detail || '';
+    pane.lastSeen = now;
+    this.panes.set(event.file, pane);
 
-    if (event.file === this.shownFile) {
-      // Same file: just re-trigger the crawl, no need to resend the text.
-      this.panel.webview.postMessage({ type: 'touch', ...header });
-      return;
-    }
-
-    const lines = this.readLines(event.file);
-    if (lines === undefined) {
-      // Unreadable (binary/too big/deleted): still move the spider, show a notice.
-      this.panel.webview.postMessage({ type: 'touch', ...header });
-      return;
-    }
-    this.shownFile = event.file;
-    this.panel.webview.postMessage({ type: 'file', ...header, lines });
+    this.prune(now);
+    this.sendPanes();
   }
 
-  private readLines(file: string): string[] | undefined {
+  // Drop panes whose file has been quiet past the TTL, and keep only the most
+  // recently active MAX_PANES so the grid stays readable.
+  private prune(now: number): void {
+    for (const [file, p] of this.panes) {
+      if (now - p.lastSeen > PANE_TTL_MS) {
+        this.panes.delete(file);
+      }
+    }
+    if (this.panes.size > MAX_PANES) {
+      const keep = [...this.panes.values()]
+        .sort((a, b) => b.lastSeen - a.lastSeen)
+        .slice(0, MAX_PANES);
+      const keepSet = new Set(keep.map((p) => p.file));
+      for (const file of [...this.panes.keys()]) {
+        if (!keepSet.has(file)) {
+          this.panes.delete(file);
+        }
+      }
+    }
+  }
+
+  private sendPanes(): void {
+    const panes = [...this.panes.values()]
+      .sort((a, b) => a.lastSeen - b.lastSeen) // stable-ish: oldest first, newest last
+      .map((p) => {
+        const info = this.readLines(p.file);
+        const base = {
+          file: p.file,
+          agent: p.agent,
+          op: p.op,
+          color: p.color,
+          startLine: p.startLine,
+          endLine: p.endLine,
+          detail: p.detail,
+        };
+        // Only ship the text when the pane is new or its content changed (write),
+        // so re-touches of an unchanged file stay cheap.
+        if (info && info.mtime !== p.sentMtime) {
+          p.sentMtime = info.mtime;
+          return { ...base, lines: info.lines };
+        }
+        if (!info) {
+          return { ...base, unreadable: true };
+        }
+        return base;
+      });
+    this.panel.webview.postMessage({ type: 'panes', panes });
+  }
+
+  private readLines(file: string): { lines: string[]; mtime: number } | undefined {
     try {
       const abs = vscode.Uri.joinPath(this.root, file).fsPath;
       const stat = fs.statSync(abs);
@@ -101,11 +180,10 @@ export class CodeCrawlPanel {
         return undefined;
       }
       const text = fs.readFileSync(abs, 'utf8');
-      // Reject content that looks binary (NUL byte in the first chunk).
       if (text.slice(0, 4096).includes('\u0000')) {
-        return undefined;
+        return undefined; // looks binary
       }
-      return text.split(/\r?\n/).slice(0, MAX_LINES);
+      return { lines: text.split(/\r?\n/).slice(0, MAX_LINES), mtime: stat.mtimeMs };
     } catch {
       return undefined;
     }
@@ -127,16 +205,16 @@ export class CodeCrawlPanel {
   <title>AMLOG Code Crawl</title>
 </head>
 <body>
-  <div id="header">
-    <span id="dot"></span>
-    <span id="agent">waiting for agent activity…</span>
-    <span id="op"></span>
-    <span id="file"></span>
+  <div id="toolbar">
+    <span id="status">waiting for agent activity…</span>
+    <span id="zoom-controls">
+      <button id="zoom-out" title="Zoom out (Ctrl+-)">−</button>
+      <span id="zoom-level">100%</span>
+      <button id="zoom-in" title="Zoom in (Ctrl++)">+</button>
+      <button id="zoom-reset" title="Reset zoom">⤢</button>
+    </span>
   </div>
-  <div id="viewport">
-    <pre id="code"></pre>
-  </div>
-  <canvas id="overlay"></canvas>
+  <div id="panes"></div>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
 </html>`;
@@ -144,6 +222,9 @@ export class CodeCrawlPanel {
 
   dispose(): void {
     CodeCrawlPanel.current = undefined;
+    if (this.sweepTimer) {
+      clearInterval(this.sweepTimer);
+    }
     this.panel.dispose();
     for (const d of this.disposables) {
       d.dispose();

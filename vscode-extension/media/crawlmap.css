@@ -72,14 +72,77 @@ html, body {
   opacity: 0.8;
 }
 
-#canvas {
+.zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.zoom button {
+  padding: 2px 8px !important;
+}
+#zoom-level {
+  min-width: 42px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+#stage {
   position: absolute;
   top: 32px;
   left: 0;
-  width: 100%;
-  height: calc(100% - 32px - 72px);
-  display: block;
+  right: 0;
+  bottom: 72px;
+  display: flex;
 }
+
+#canvas {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+#canvas:active { cursor: grabbing; }
+
+#recap {
+  width: 300px;
+  flex: 0 0 300px;
+  height: 100%;
+  overflow-y: auto;
+  box-sizing: border-box;
+  border-left: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.22));
+  padding: 8px 10px;
+  font-size: 12px;
+}
+#recap.hidden { display: none; }
+#recap-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  opacity: 0.9;
+}
+.recap-agent { margin-bottom: 12px; }
+.recap-agent-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.recap-agent-name .legend-dot { width: 9px; height: 9px; }
+.recap-step {
+  display: flex;
+  gap: 6px;
+  padding: 1px 0 1px 15px;
+  opacity: 0.85;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recap-step .op-r { color: rgba(120, 170, 230, 0.95); }
+.recap-step .op-w { color: rgba(230, 150, 90, 0.95); }
 
 #ticker {
   position: fixed;

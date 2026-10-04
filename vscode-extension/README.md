@@ -19,19 +19,24 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
 
 - **Code Crawl** (`AMLOG: Open Code Crawl`): renders the text of the file the
   active agent is touching and crawls an **articulated, line-drawn spider over the
-  actual code lines**, so what you see maps to what the agent is doing:
+  actual code lines**, walking **line by line** and pausing to "inspect" each one:
   - **Writing** → the spider walks down the edited run, **weaving a silk web**
     over the lines it writes and *stitching* each line left-to-right with a caret.
-  - **Reading** → it scans the range, sweeping a thin **scan beam** across each
-    line it inspects.
-  - A **status bubble** over the spider says what it's doing ("✎ edited 5 line(s)
+  - **Reading** → it steps through the lines, sweeping a thin **scan beam** across
+    each line; a whole-file read scans top-to-bottom.
+  - **Multiple files at once** → the view **splits into a grid** (up to 4 panes),
+    each with its own spider working that file; a pane clears a few seconds after
+    its file goes quiet.
+  - **Zoom** with the toolbar buttons or **Ctrl/Cmd + mouse wheel**.
+  - A **status bubble** over each spider says what it's doing ("✎ edited 5 line(s)
     @ line 142" / "👁 read lines 1–200") — the same detail the terminal shows.
 
-  When the event carries a line range the spider crawls those exact lines. This is
-  the literal "spider on the file" effect.
+  When the event carries a line range the spider crawls those exact lines.
 - **Crawl Map** (`AMLOG: Open Crawl Map`): a bird's-eye view — files as nodes, an
   animated spider per agent crawling between them with a fading silk trail, a
-  legend, a live event ticker, and pause/resume.
+  legend, and a live event ticker. **Zoom** with the wheel or buttons, **drag to
+  pan**, and toggle a **Flow Recap** panel that lists, per agent, the ordered
+  sequence of reads/writes.
 - **Gutter spider + line highlight** on any open file an agent just touched,
   colored per agent, fading after a few seconds. *(Command: `AMLOG: Toggle Spider
   Decorations`.)*
@@ -47,8 +52,8 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
 >
 > *Line targeting:* the capture hook derives the line range from the tool call's
 > `tool_input` (`Read` offset/limit, `Write`/`Edit` line counts, Edit start line
-> located in the file). When present the spider crawls those exact lines; when not
-> derivable (e.g. a whole-file read) it falls back to a plausible working pattern.
+> located in the file). When present the spider walks those exact lines; a
+> whole-file read (no range) scans the whole file top-to-bottom.
 
 ## Settings
 

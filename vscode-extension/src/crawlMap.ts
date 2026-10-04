@@ -81,10 +81,23 @@ export class CrawlMapPanel {
 <body>
   <div id="toolbar">
     <button id="toggle">⏸ Pause</button>
+    <span class="zoom">
+      <button id="zoom-out" title="Zoom out">−</button>
+      <span id="zoom-level">100%</span>
+      <button id="zoom-in" title="Zoom in">+</button>
+      <button id="zoom-reset" title="Reset view">⤢</button>
+    </span>
+    <button id="recap-toggle" title="Toggle flow recap">☰ Recap</button>
     <span id="legend"></span>
     <span id="stats"></span>
   </div>
-  <canvas id="canvas"></canvas>
+  <div id="stage">
+    <canvas id="canvas"></canvas>
+    <aside id="recap" class="hidden">
+      <div id="recap-title">Flow recap</div>
+      <div id="recap-body"></div>
+    </aside>
+  </div>
   <div id="ticker"></div>
   <script nonce="${nonce}" src="${script}"></script>
 </body>
