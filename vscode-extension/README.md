@@ -18,12 +18,13 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
 ## What you get
 
 - **Code Crawl** (`AMLOG: Open Code Crawl`): renders the text of the file the
-  active agent is touching and crawls an **articulated, line-drawn spider over the
-  actual code lines**, walking **line by line** and pausing to "inspect" each one:
-  - **Writing** → the spider walks down the edited run, **weaving a silk web**
-    over the lines it writes and *stitching* each line left-to-right with a caret.
-  - **Reading** → it steps through the lines, sweeping a thin **scan beam** across
-    each line; a whole-file read scans top-to-bottom.
+  active agent is touching and crawls an **articulated, line-drawn spider that
+  walks along the code itself** — it drops onto a line and crawls left-to-right
+  across the actual characters, then down to the next line:
+  - **Writing** → as it walks a line it **weaves a silk web** and *stitches* the
+    code behind it, with a caret at the spider.
+  - **Reading** → it walks each line sweeping a thin **scan beam**; a whole-file
+    read walks the whole file top-to-bottom.
   - **Multiple files at once** → the view **splits into a grid** (up to 4 panes),
     each with its own spider working that file; a pane clears a few seconds after
     its file goes quiet.
