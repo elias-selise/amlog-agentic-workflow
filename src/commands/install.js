@@ -7,6 +7,7 @@ const ora = require('ora');
 const prompts = require('prompts');
 const { resolveTargetTypes, resolveTargetTools, filterAgents, loadManifest, getKnownTypes } = require('../lib/manifest');
 const { installAgents } = require('../lib/copy-agents');
+const { installActivityHook } = require('../lib/hooks');
 const { TOOL_IDS, getAdapter } = require('../lib/adapters');
 const { bootstrapKnowledgeBase, detectPlausibleZones } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
@@ -183,6 +184,18 @@ async function runInstall(opts) {
 
   ok.forEach(r => console.log(chalk.green(`  ✓ [${r.tool}] ${r.agent.type}/${r.agent.name}`)));
   failed.forEach(r => console.log(chalk.red(`  ✗ [${r.tool}] ${r.agent.type}/${r.agent.name}: ${r.error}`)));
+
+  // 4b. Wire the Claude Code activity-capture hook so agent file reads/writes
+  // are logged to .amlog/activity/events.ndjson (the "spider crawler" feed).
+  // Claude-only: the per-agent labelling it relies on is Claude-Code-specific.
+  if (targetTools.includes('claude') && ok.some((r) => r.tool === 'claude')) {
+    try {
+      const { installed } = installActivityHook(WORKSPACE);
+      console.log(chalk.green(`  ✓ ${installed ? 'Registered' : 'Verified'} activity-capture hook (.claude/settings.json)`));
+    } catch (err) {
+      console.log(chalk.yellow(`  ⚠  Could not register activity-capture hook: ${err.message}`));
+    }
+  }
 
   // 5. Ensure amlog/CodeGraph artifacts are gitignored
   ensureGitignoreEntries(WORKSPACE);

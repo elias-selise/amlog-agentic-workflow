@@ -1,0 +1,104 @@
+{
+  "name": "amlog-spider-crawler",
+  "displayName": "AMLOG Spider Crawler",
+  "description": "Live visualization of which files each AMLOG agent reads and writes — a line-drawn spider crawls your files in real time.",
+  "version": "0.1.0",
+  "publisher": "selise",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.84.0"
+  },
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "amlog",
+    "agents",
+    "visualization",
+    "spider",
+    "ai"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/.amlog/activity/events.ndjson",
+    "workspaceContains:**/.amlog/state.json"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "amlog.openCrawlMap",
+        "title": "AMLOG: Open Crawl Map",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "amlog.toggleDecorations",
+        "title": "AMLOG: Toggle Spider Decorations"
+      },
+      {
+        "command": "amlog.clearActivity",
+        "title": "AMLOG: Clear Activity"
+      }
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "amlogActivity",
+          "name": "AMLOG Activity",
+          "icon": "$(bug)",
+          "contextualTitle": "AMLOG Activity"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "amlog.openCrawlMap",
+          "when": "view == amlogActivity",
+          "group": "navigation"
+        },
+        {
+          "command": "amlog.clearActivity",
+          "when": "view == amlogActivity",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "AMLOG Spider Crawler",
+      "properties": {
+        "amlog.autoRevealOnWrite": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reveal the file in an editor when an agent writes to it."
+        },
+        "amlog.decorationTtlMs": {
+          "type": "number",
+          "default": 4000,
+          "description": "How long (ms) the spider decoration lingers on a file after a read/write before fading."
+        },
+        "amlog.showDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the gutter spider + line highlight on files agents touch."
+        },
+        "amlog.trailLength": {
+          "type": "number",
+          "default": 8,
+          "description": "How many recently touched files each agent's silk trail connects in the crawl map."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.84.0",
+    "typescript": "^5.4.0"
+  }
+}

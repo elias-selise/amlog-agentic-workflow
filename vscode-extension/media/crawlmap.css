@@ -1,0 +1,102 @@
+:root {
+  color-scheme: light dark;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+
+#toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.2));
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+  z-index: 2;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+#toolbar button {
+  font: inherit;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  border: none;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+#toolbar button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+#legend {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+#stats {
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+#canvas {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 32px - 72px);
+  display: block;
+}
+
+#ticker {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+  overflow: hidden;
+  padding: 4px 10px;
+  box-sizing: border-box;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 11px;
+  line-height: 1.4;
+  background: var(--vscode-sideBar-background, rgba(0, 0, 0, 0.2));
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.3));
+}
+
+.tick-line {
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

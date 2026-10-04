@@ -192,6 +192,36 @@ document (Appendix A) for convenience.
 
 ---
 
+## 6b. Agent activity capture (spider crawler feed)
+
+On `amlog install` / `amlog update` for the **Claude Code** adapter, the CLI wires
+a `PostToolUse` hook so every file an agent reads or writes is recorded. This is
+the data feed for the "spider crawler" visualization (the `vscode-extension/`
+package).
+
+- **Hook script:** `registry/hooks/amlog-activity-hook.js` is copied to
+  `.amlog/hooks/amlog-activity-hook.js`. It is dependency-free and fail-safe —
+  any error is swallowed and it always exits 0, so it can never break an agent's
+  tool call.
+- **Registration:** `src/lib/hooks.js` merges a `PostToolUse` entry (matcher
+  `Read|Write|Edit|MultiEdit|NotebookEdit`) into `.claude/settings.json`,
+  preserving any existing settings/hooks. Idempotent; `amlog uninstall` removes it.
+- **Output:** one NDJSON line per file touch appended to
+  `.amlog/activity/events.ndjson` (gitignored, size-rotated):
+  ```json
+  {"ts":"<ISO>","op":"read|write","file":"<workspace-relative>","agent":"<agent_type|main>","agentId":"…","tool":"Edit","session":"…","toolUseId":"…"}
+  ```
+  The acting subagent is taken from the hook's `agent_type`/`agent_id` fields
+  (present only inside a subagent); the top-level session is labelled `main`.
+- **Claude-only for now:** per-agent labelling relies on Claude Code's hook
+  fields. Other adapters can emit the same NDJSON schema later without changing
+  the consumer.
+- **Related wishlist:** execution metrics (tokens/model/time) are *not* available
+  in hook input — they live in the transcript — so they are a separate future
+  `metrics.ndjson`, not part of this capture.
+
+---
+
 ## 7. Full agent roster
 
 Every agent below needs an `agent.md` (the skill/definition) under
@@ -382,10 +412,13 @@ amlog-workflow/
 │   └── lib/
 │       ├── manifest.js            # reads/filters registry/manifest.json
 │       ├── copy-agents.js         # copies matching agent folders into .amlog/
+│       ├── hooks.js               # registers the Claude Code activity-capture hook (Section 6b)
 │       ├── detect-agent-cli.js    # finds CLAUDE.md / AGENTS.md / GEMINI.md etc.
 │       └── knowledge-base.js      # the CodeGraph bootstrap logic (Section 6)
 ├── registry/
 │   ├── manifest.json              # full agent registry — see Section 10 schema
+│   ├── hooks/
+│   │   └── amlog-activity-hook.js # PostToolUse hook → .amlog/activity/events.ndjson (Section 6b)
 │   ├── knowledge-base-setup/
 │   │   ├── agent.md
 │   │   └── scripts/

@@ -9,6 +9,7 @@ const { detectAgentInstructionFile } = require('../lib/detect-agent-cli');
 const { getInstalledTools } = require('../lib/copy-agents');
 const { getAdapter } = require('../lib/adapters');
 const { findRouterSections } = require('../lib/router');
+const { isActivityHookInstalled } = require('../lib/hooks');
 const { getHandoffSettings } = require('../lib/workflow-config');
 
 const WORKSPACE = process.cwd();
@@ -75,6 +76,15 @@ async function runDoctor() {
     }
     const { autoHandover, maxHandoffRepeats } = getHandoffSettings(WORKSPACE);
     ok('Handoff settings', `auto_handover: ${autoHandover}, max_handoff_repeats: ${maxHandoffRepeats}`);
+
+    // Activity-capture hook feeds the spider crawler; only expected for Claude Code.
+    if (getInstalledTools(WORKSPACE).includes('claude')) {
+      if (isActivityHookInstalled(WORKSPACE)) {
+        ok('Activity-capture hook', '.amlog/activity/events.ndjson is being fed');
+      } else {
+        fail('Activity-capture hook missing', 'run `amlog install` to re-register it in .claude/settings.json');
+      }
+    }
   } else {
     fail('.amlog/state.json missing', 'run `amlog install` in this workspace');
   }
