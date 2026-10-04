@@ -5,6 +5,11 @@
   "version": "0.1.0",
   "publisher": "selise",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/selise/amlog-workflow.git",
+    "directory": "vscode-extension"
+  },
   "engines": {
     "vscode": "^1.84.0"
   },
