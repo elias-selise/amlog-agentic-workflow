@@ -103,20 +103,22 @@
       for (let i = 0; i < steps; i++) {
         plan.push(clamp(from + Math.round((i * (span - 1)) / Math.max(1, steps - 1))));
       }
+    } else if (op === 'read') {
+      // "read whole file" carries no line range — so sweep the spider from the
+      // top to the bottom of the file, which reads as "scanning the whole file"
+      // instead of sitting at line 1.
+      const waypoints = Math.min(n, 36);
+      for (let i = 0; i < waypoints; i++) {
+        plan.push(clamp(Math.round((i * (n - 1)) / Math.max(1, waypoints - 1))));
+      }
     } else {
-      const start = targets.length ? targets[targets.length - 1] : Math.floor(Math.random() * n);
-      if (op === 'write') {
-        let line = clamp(start);
-        const run = 4 + Math.floor(Math.random() * 5);
-        for (let i = 0; i < run; i++) {
-          line = clamp(line + 1 + Math.floor(Math.random() * 2));
-          plan.push(line);
-        }
-      } else {
-        const hops = 3 + Math.floor(Math.random() * 4);
-        for (let i = 0; i < hops; i++) {
-          plan.push(Math.floor(Math.random() * n));
-        }
+      // No-range write (rare): a short downward run from where it is.
+      const start = targets.length ? targets[targets.length - 1] : 0;
+      let line = clamp(start);
+      const run = 4 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < run; i++) {
+        line = clamp(line + 1 + Math.floor(Math.random() * 2));
+        plan.push(line);
       }
     }
     targets = targets.concat(plan);
@@ -355,17 +357,22 @@
     } else if (targets.length > 0) {
       const next = targets[0];
       aimDocY = lineCenterDocY(next);
-      if (Math.abs(bodyDocY - aimDocY) < 2.5) {
+      if (Math.abs(bodyDocY - aimDocY) < 2) {
         arrive(next, currentOp);
         targets.shift();
-        dwell = currentOp === 'write' ? 220 : 120;
+        // brief pause so the stitch/scan effect is visible, short so the crawl flows
+        dwell = currentOp === 'write' ? 130 : 55;
       }
     }
 
+    // Constant-speed crawl (px/ms): predictable and brisk, unlike exponential
+    // easing which made even a short move take ~0.5s and a whole-file scan ~25s.
     const d = aimDocY - bodyDocY;
     if (Math.abs(d) > 0.5) {
       dir = d > 0 ? 1 : -1;
-      bodyDocY += d * Math.min(1, dt / 240);
+      const SPEED = 0.42; // ~a line every ~45ms — reads as crawling, not teleporting
+      const stepPx = SPEED * dt;
+      bodyDocY = stepPx >= Math.abs(d) ? aimDocY : bodyDocY + dir * stepPx;
     }
 
     draw(dt);
