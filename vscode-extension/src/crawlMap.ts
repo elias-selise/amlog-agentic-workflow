@@ -88,6 +88,7 @@ export class CrawlMapPanel {
       <button id="zoom-reset" title="Reset view">⤢</button>
     </span>
     <button id="recap-toggle" title="Toggle flow recap">☰ Recap</button>
+    <label class="focus-label">Focus <select id="focus"><option value="">all agents</option></select></label>
     <span id="legend"></span>
     <span id="stats"></span>
   </div>

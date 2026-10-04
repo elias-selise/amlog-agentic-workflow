@@ -37,7 +37,23 @@ workspace file the hook writes. Run `amlog install` (Claude Code adapter) first.
   animated spider per agent crawling between them with a fading silk trail, a
   legend, and a live event ticker. **Zoom** with the wheel or buttons, **drag to
   pan**, and toggle a **Flow Recap** panel that lists, per agent, the ordered
-  sequence of reads/writes.
+  sequence of reads/writes/searches. Nodes are tinted by the last op
+  (read / write / 🔍 search / `$` bash).
+- **Focus one agent** — both views have a **Focus** dropdown to pin the view to a
+  single agent (e.g. one subagent) and hide the rest.
+
+### What's captured (and where it shows)
+The hook records **subagent activity too** — each event is tagged with the agent
+(`agent_type`), or `main` for the top-level session.
+- **Read / Write / Edit** → the **Code Crawl** (spider walks the code) and the Crawl Map.
+- **Grep / Glob (search)** and **Bash** → the **Crawl Map**, ticker and recap
+  (they have no single file+lines to walk, so they don't open a Code Crawl pane).
+- Not captured: file changes made *inside* a Bash script (only the `Bash` call
+  itself is logged, with its command/description).
+
+> Heads-up: the spider shows **completed** tool calls. While an agent is only
+> *thinking*, or an edit is proposed but not yet applied/approved, there's no
+> event yet — so the view can be momentarily quiet even though an agent is busy.
 - **Gutter spider + line highlight** on any open file an agent just touched,
   colored per agent, fading after a few seconds. *(Command: `AMLOG: Toggle Spider
   Decorations`.)*

@@ -11,7 +11,7 @@ const MAX_BYTES = 512 * 1024;
 // How many files can be "crawled" at once (a grid of panes), and how long a
 // pane lingers after its file's last event before it is dropped.
 const MAX_PANES = 4;
-const PANE_TTL_MS = 6000;
+const PANE_TTL_MS = 10000;
 
 interface PaneState {
   file: string;
@@ -94,6 +94,10 @@ export class CodeCrawlPanel {
   }
 
   post(event: ActivityEvent): void {
+    // Code Crawl walks real code — only read/write map to a file + lines.
+    if (event.op !== 'read' && event.op !== 'write') {
+      return;
+    }
     if (!this.ready) {
       this.pending = event; // replay the latest once the webview reports ready
       return;
@@ -207,6 +211,7 @@ export class CodeCrawlPanel {
 <body>
   <div id="toolbar">
     <span id="status">waiting for agent activity…</span>
+    <label class="focus-label">Focus <select id="focus"><option value="">all agents</option></select></label>
     <span id="zoom-controls">
       <button id="zoom-out" title="Zoom out (Ctrl+-)">−</button>
       <span id="zoom-level">100%</span>

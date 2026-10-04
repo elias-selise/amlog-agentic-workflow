@@ -13,6 +13,18 @@
   const zoomLevelEl = document.getElementById('zoom-level');
   const recapEl = document.getElementById('recap');
   const recapBody = document.getElementById('recap-body');
+  const focusEl = /** @type {HTMLSelectElement} */ (document.getElementById('focus'));
+
+  let focusAgent = ''; // '' = all agents
+
+  // op -> label icon and node tint
+  const OP_ICON = { read: '👁', write: '✎', search: '🔍', bash: '$' };
+  function opFill(op, alpha) {
+    if (op === 'write') { return `rgba(220,120,80,${alpha})`; }
+    if (op === 'search') { return `rgba(180,120,230,${alpha})`; }
+    if (op === 'bash') { return `rgba(150,150,150,${alpha})`; }
+    return `rgba(120,160,220,${alpha})`;
+  }
 
   // pan / zoom of the map (world -> screen: screen = world * view + pan)
   let view = 1;
@@ -62,7 +74,7 @@
     let node = nodes.get(file);
     if (!node) {
       const pos = placeNode();
-      node = { x: pos.x, y: pos.y, label: file.split('/').pop() || file, reads: 0, writes: 0, pulse: 0 };
+      node = { x: pos.x, y: pos.y, label: file.split('/').pop() || file, reads: 0, writes: 0, pulse: 0, lastOp: 'read' };
       nodes.set(file, node);
     }
     return node;
@@ -70,7 +82,8 @@
 
   function handleEvent(ev) {
     const node = ensureNode(ev.file);
-    if (ev.op === 'read') { node.reads++; } else { node.writes++; }
+    if (ev.op === 'write') { node.writes++; } else { node.reads++; }
+    node.lastOp = ev.op;
     node.pulse = 1;
 
     let spider = spiders.get(ev.agent);
@@ -78,9 +91,10 @@
       spider = { color: ev.color, x: node.x, y: node.y, tx: node.x, ty: node.y, target: ev.file, legPhase: 0, label: ev.agent };
       spiders.set(ev.agent, spider);
       renderLegend();
+      populateFocus();
     }
     // Draw a silk thread from where the spider is heading now to the new target.
-    threads.push({ from: { x: spider.tx, y: spider.ty }, to: { x: node.x, y: node.y }, color: spider.color, age: 0 });
+    threads.push({ from: { x: spider.tx, y: spider.ty }, to: { x: node.x, y: node.y }, color: spider.color, agent: ev.agent, age: 0 });
     while (threads.length > 160) { threads.shift(); }
     spider.tx = node.x;
     spider.ty = node.y;
@@ -89,7 +103,7 @@
 
     const when = (ev.ts || '').slice(11, 19);
     const detail = ev.detail ? `  (${ev.detail})` : '';
-    ticks.unshift(`${when}  ${ev.agent}  ${ev.op === 'write' ? '✎' : '👁'}  ${ev.file}${detail}`);
+    ticks.unshift(`${when}  ${ev.agent}  ${OP_ICON[ev.op] || '•'}  ${ev.file}${detail}`);
     while (ticks.length > 6) { ticks.pop(); }
 
     flow.push({ agent: ev.agent, color: ev.color, op: ev.op, file: ev.file, detail: ev.detail || '', when });
@@ -134,7 +148,7 @@
         row.className = 'recap-step';
         const icon = document.createElement('span');
         icon.className = step.op === 'write' ? 'op-w' : 'op-r';
-        icon.textContent = step.op === 'write' ? '✎' : '👁';
+        icon.textContent = OP_ICON[step.op] || '•';
         const text = document.createElement('span');
         const base = step.file.split('/').pop() || step.file;
         text.textContent = step.detail ? `${base} — ${step.detail}` : base;
@@ -174,6 +188,23 @@
 
   function renderStats() {
     statsEl.textContent = `${spiders.size} agent(s) · ${nodes.size} file(s)`;
+  }
+
+  // Keep the focus dropdown in sync with the agents we've seen.
+  function populateFocus() {
+    const want = ['', ...spiders.keys()];
+    const have = Array.from(focusEl.options).map((o) => o.value);
+    if (want.length === have.length && want.every((v, i) => v === have[i])) { return; }
+    const current = focusEl.value;
+    focusEl.innerHTML = '';
+    for (const v of want) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v || 'all agents';
+      focusEl.appendChild(opt);
+    }
+    focusEl.value = want.includes(current) ? current : '';
+    focusAgent = focusEl.value;
   }
 
   function drawSpider(s) {
@@ -227,6 +258,7 @@
         t.age += 0.01;
         const a = Math.max(0, 0.5 - t.age * 0.5);
         if (a <= 0) { continue; }
+        if (focusAgent && t.agent !== focusAgent) { continue; }
         ctx.strokeStyle = t.color;
         ctx.globalAlpha = a;
         ctx.lineWidth = 1;
@@ -237,24 +269,23 @@
       }
       ctx.globalAlpha = 1;
 
-      // file nodes
+      // file nodes (tinted by the last operation on them)
       for (const node of nodes.values()) {
-        const written = node.writes > 0;
-        ctx.fillStyle = written ? 'rgba(220,120,80,0.9)' : 'rgba(120,160,220,0.9)';
+        const op = node.lastOp || 'read';
         const size = 3 + Math.min(6, (node.reads + node.writes) * 0.4);
         if (node.pulse > 0) {
           ctx.globalAlpha = node.pulse * 0.5;
           ctx.beginPath();
           ctx.arc(node.x, node.y, size + node.pulse * 12, 0, Math.PI * 2);
-          ctx.fillStyle = written ? 'rgba(220,120,80,0.6)' : 'rgba(120,160,220,0.6)';
+          ctx.fillStyle = opFill(op, 0.6);
           ctx.fill();
           node.pulse = Math.max(0, node.pulse - 0.03);
           ctx.globalAlpha = 1;
         }
         ctx.save();
-        ctx.shadowColor = written ? 'rgba(220,120,80,0.8)' : 'rgba(120,160,220,0.8)';
-        ctx.shadowBlur = written ? 8 : 5;
-        ctx.fillStyle = written ? 'rgba(220,120,80,0.95)' : 'rgba(120,160,220,0.95)';
+        ctx.shadowColor = opFill(op, 0.8);
+        ctx.shadowBlur = op === 'write' ? 8 : 5;
+        ctx.fillStyle = opFill(op, 0.95);
         ctx.beginPath();
         ctx.arc(node.x, node.y, size, 0, Math.PI * 2);
         ctx.fill();
@@ -266,6 +297,7 @@
 
       // spiders crawl toward their current target
       for (const s of spiders.values()) {
+        if (focusAgent && s.label !== focusAgent) { continue; }
         const dx = s.tx - s.x;
         const dy = s.ty - s.y;
         const dist = Math.hypot(dx, dy);
@@ -298,6 +330,7 @@
       flow.length = 0;
       placeIndex = 0;
       renderLegend();
+      populateFocus();
       renderTicker();
       renderStats();
       if (recapVisible) { renderRecap(); }
@@ -340,6 +373,8 @@
   document.getElementById('zoom-in').addEventListener('click', () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.2));
   document.getElementById('zoom-out').addEventListener('click', () => zoomAt(canvas.clientWidth / 2, canvas.clientHeight / 2, 1 / 1.2));
   document.getElementById('zoom-reset').addEventListener('click', () => { view = 1; panX = 0; panY = 0; setZoomLabel(); });
+
+  focusEl.addEventListener('change', () => { focusAgent = focusEl.value; });
 
   document.getElementById('recap-toggle').addEventListener('click', () => {
     recapVisible = !recapVisible;

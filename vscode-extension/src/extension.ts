@@ -65,7 +65,12 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const onEvent = (event: ActivityEvent, live: boolean) => {
     state.apply(event);
-    decorations.onEvent(event);
+    // Only read/write map to a concrete file + lines; search (dir) and bash have
+    // no code to crawl, so they appear in the Crawl Map / recap only.
+    const isFileOp = event.op === 'read' || event.op === 'write';
+    if (isFileOp) {
+      decorations.onEvent(event);
+    }
 
     backlog.push(event);
     while (backlog.length > BACKLOG_MAX) {
@@ -73,7 +78,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     lastEvent = event;
     crawlMap?.post(event);
-    codeCrawl?.post(event);
+    if (isFileOp) {
+      codeCrawl?.post(event);
+    }
 
     if (live && event.op === 'write' && config().get<boolean>('autoRevealOnWrite', false)) {
       const uri = vscode.Uri.joinPath(root, event.file);

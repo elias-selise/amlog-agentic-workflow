@@ -5,7 +5,7 @@ import { colorForAgent } from './palette';
 interface ActiveTouch {
   file: string;
   color: string;
-  op: 'read' | 'write';
+  op: string;
   expiry: number;
 }
 

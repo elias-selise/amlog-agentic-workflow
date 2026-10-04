@@ -23,13 +23,17 @@ const path = require('path');
 // bound. `.amlog/` is gitignored, so rotation is invisible to version control.
 const MAX_BYTES = 5 * 1024 * 1024;
 
-// Tool name -> coarse operation. Anything that changes a file is a "write".
+// Tool name -> coarse operation. Writes change a file; reads inspect one; search
+// looks across files (Grep/Glob); bash runs a shell command (path approximate).
 const OP_BY_TOOL = {
   Read: 'read',
   Write: 'write',
   Edit: 'write',
   MultiEdit: 'write',
   NotebookEdit: 'write',
+  Grep: 'search',
+  Glob: 'search',
+  Bash: 'bash',
 };
 
 // Only search inside a file (to locate an Edit's line) when it is small enough
@@ -39,6 +43,11 @@ const MAX_LOCATE_BYTES = 1024 * 1024;
 function countLines(text) {
   if (typeof text !== 'string' || text === '') return 0;
   return text.split(/\r?\n/).length;
+}
+
+function truncate(text, max) {
+  const s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 // 1-based line number where `needle` first appears in the file at `absPath`,
@@ -100,6 +109,23 @@ function describeRange(toolName, toolInput, absPath) {
       const cell = toolInput.cell_id ? ` cell ${toolInput.cell_id}` : '';
       return { detail: `notebook ${mode}${cell}` };
     }
+
+    if (toolName === 'Grep') {
+      const pat = truncate(toolInput.pattern, 40);
+      const where = toolInput.glob ? ` in ${truncate(toolInput.glob, 20)}` : '';
+      return { detail: `grep "${pat}"${where}` };
+    }
+
+    if (toolName === 'Glob') {
+      return { detail: `glob ${truncate(toolInput.pattern, 50)}` };
+    }
+
+    if (toolName === 'Bash') {
+      const desc = typeof toolInput.description === 'string' && toolInput.description
+        ? toolInput.description
+        : truncate(toolInput.command, 60);
+      return { detail: `$ ${desc}` };
+    }
   } catch {
     // fall through to the empty descriptor
   }
@@ -158,22 +184,35 @@ async function main() {
   if (!op) return; // Not a file tool we track (defensive; matcher already filters).
 
   const toolInput = input.tool_input && typeof input.tool_input === 'object' ? input.tool_input : {};
-  const filePath = pick(toolInput, ['file_path', 'notebook_path', 'path']);
-  if (!filePath) return; // Nothing to point the spider at.
 
   // Root the workspace on the hook's reported cwd (Claude Code sets this to the
   // project dir); fall back to the process cwd.
   const workspaceDir = (typeof input.cwd === 'string' && input.cwd) || process.cwd();
 
-  let absPath = filePath;
-  let relFile = filePath;
-  try {
-    absPath = path.isAbsolute(filePath) ? filePath : path.resolve(workspaceDir, filePath);
-    relFile = path.relative(workspaceDir, absPath) || path.basename(absPath);
-  } catch {
-    // Keep the raw path if resolution fails.
+  // What the tool is pointed at. read/write need a concrete file; search points
+  // at a path (often a directory, defaulting to the workspace); bash has no path.
+  let rawPath;
+  if (op === 'read' || op === 'write') {
+    rawPath = pick(toolInput, ['file_path', 'notebook_path']);
+    if (!rawPath) return; // Nothing to point the spider at.
+  } else if (op === 'search') {
+    rawPath = pick(toolInput, ['path']) || '.';
+  } else {
+    rawPath = null; // bash
   }
-  relFile = relFile.split(path.sep).join('/'); // Stable, POSIX-style for the UI.
+
+  let absPath = rawPath || '';
+  let relFile = op === 'bash' ? '(bash)' : rawPath;
+  if (rawPath) {
+    try {
+      absPath = path.isAbsolute(rawPath) ? rawPath : path.resolve(workspaceDir, rawPath);
+      const rel = path.relative(workspaceDir, absPath);
+      relFile = rel === '' ? '.' : rel; // the workspace root reads as "."
+    } catch {
+      // Keep the raw path if resolution fails.
+    }
+    relFile = (relFile || '.').split(path.sep).join('/'); // POSIX-style for the UI.
+  }
 
   // `agent_type` / `agent_id` are present only when the tool ran inside a
   // subagent. The main session reports neither, so it is labelled "main".

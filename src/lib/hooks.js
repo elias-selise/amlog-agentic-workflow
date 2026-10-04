@@ -9,8 +9,9 @@ const fs = require('fs-extra');
 const HOOK_SRC = path.join(__dirname, '../../registry/hooks/amlog-activity-hook.js');
 const HOOK_SCRIPT_REL = path.join('.amlog', 'hooks', 'amlog-activity-hook.js');
 
-// File tools whose calls we want to observe. Mirrors OP_BY_TOOL in the hook.
-const HOOK_MATCHER = 'Read|Write|Edit|MultiEdit|NotebookEdit';
+// Tools whose calls we want to observe (read/write/edit, plus search and bash).
+// Mirrors OP_BY_TOOL in the hook.
+const HOOK_MATCHER = 'Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob|Bash';
 // Command Claude Code runs. Relative to the workspace (Claude runs hooks with
 // cwd = project root). Forward slashes work cross-platform for `node <path>`.
 const HOOK_COMMAND = `node ${HOOK_SCRIPT_REL.split(path.sep).join('/')}`;
@@ -70,7 +71,20 @@ function installActivityHook(workspaceDir) {
 
   const settings = readSettings(workspaceDir);
   if (hasActivityHook(settings)) {
-    return { installed: false, settingsFile: settingsPath(workspaceDir) };
+    // Already registered — reconcile the matcher so an upgrade that widens the
+    // captured tools (e.g. adding Grep/Glob/Bash) takes effect on re-install.
+    const groups = settings.hooks.PostToolUse;
+    let updated = false;
+    for (const g of groups) {
+      if (Array.isArray(g.hooks) && g.hooks.some(isOurCommand) && g.matcher !== HOOK_MATCHER) {
+        g.matcher = HOOK_MATCHER;
+        updated = true;
+      }
+    }
+    if (updated) {
+      fs.outputJsonSync(settingsPath(workspaceDir), settings, { spaces: 2 });
+    }
+    return { installed: updated, settingsFile: settingsPath(workspaceDir) };
   }
 
   settings.hooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};

@@ -11,6 +11,10 @@
   const panesEl = /** @type {HTMLElement} */ (document.getElementById('panes'));
   const statusEl = /** @type {HTMLElement} */ (document.getElementById('status'));
   const zoomLabel = /** @type {HTMLElement} */ (document.getElementById('zoom-level'));
+  const focusEl = /** @type {HTMLSelectElement} */ (document.getElementById('focus'));
+
+  let focusAgent = ''; // '' = all agents
+  const agentsSeen = new Set();
 
   const GUTTER = 52;
   const SPEED = 0.42;     // px/ms — brisk, visible crawl
@@ -391,7 +395,7 @@
       if (!empty) {
         empty = document.createElement('div');
         empty.id = 'empty';
-        empty.textContent = 'Waiting for agent file activity…';
+        empty.textContent = 'Waiting for a file read/write… (searching, shell & thinking show in the Crawl Map)';
         panesEl.appendChild(empty);
       }
     } else if (empty) {
@@ -428,11 +432,14 @@
       if (Array.isArray(info.lines)) {
         pane.render(info.lines);
       }
+      if (info.agent) { agentsSeen.add(info.agent); }
       if (isNew) {
         updateLayout(); // grid dimensions change -> relayout before planning
       }
       pane.plan(info.startLine, info.endLine);
     }
+    populateFocus();
+    applyFocus();
     updateLayout();
 
     const files = panes.size;
@@ -440,6 +447,29 @@
     statusEl.textContent = files
       ? `${agents} agent(s) · ${files} file(s) active`
       : 'waiting for agent activity…';
+  }
+
+  // Hide panes whose agent isn't the focused one ('' = show all).
+  function applyFocus() {
+    for (const pane of panes.values()) {
+      pane.root.style.display = (!focusAgent || pane.agent === focusAgent) ? '' : 'none';
+    }
+  }
+
+  function populateFocus() {
+    const want = ['', ...agentsSeen];
+    const have = Array.from(focusEl.options).map((o) => o.value);
+    if (want.length === have.length && want.every((v, i) => v === have[i])) { return; }
+    const current = focusEl.value;
+    focusEl.innerHTML = '';
+    for (const v of want) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v || 'all agents';
+      focusEl.appendChild(opt);
+    }
+    focusEl.value = want.includes(current) ? current : '';
+    focusAgent = focusEl.value;
   }
 
   // ---- loop ----------------------------------------------------------------
@@ -453,6 +483,7 @@
     requestAnimationFrame(frame);
   }
 
+  focusEl.addEventListener('change', () => { focusAgent = focusEl.value; applyFocus(); });
   window.addEventListener('resize', () => { for (const p of panes.values()) { p.layout(); } });
   window.addEventListener('message', (e) => {
     const msg = e.data;

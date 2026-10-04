@@ -43,10 +43,10 @@ export class ActivityState {
     };
     agent.currentFile = event.file;
     agent.lastSeen = Date.parse(event.ts) || Date.now();
-    if (event.op === 'read') {
-      agent.reads++;
-    } else {
+    if (event.op === 'write') {
       agent.writes++;
+    } else {
+      agent.reads++; // read / search / bash all count as "inspecting"
     }
     // Keep the trail compact and free of immediate repeats.
     if (agent.trail[agent.trail.length - 1] !== event.file) {
@@ -64,10 +64,10 @@ export class ActivityState {
       agents: new Set<string>(),
       lastDetail: '',
     };
-    if (event.op === 'read') {
-      file.reads++;
-    } else {
+    if (event.op === 'write') {
       file.writes++;
+    } else {
+      file.reads++;
     }
     file.agents.add(event.agent);
     if (event.detail) {

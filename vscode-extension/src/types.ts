@@ -1,8 +1,10 @@
 // One line of .amlog/activity/events.ndjson, as emitted by
 // registry/hooks/amlog-activity-hook.js. Keep this in sync with that script.
+export type ActivityOp = 'read' | 'write' | 'search' | 'bash';
+
 export interface ActivityEvent {
   ts: string;
-  op: 'read' | 'write';
+  op: ActivityOp;
   file: string;
   agent: string;
   agentId: string;
@@ -27,7 +29,8 @@ export function parseEvent(line: string): ActivityEvent | null {
   }
   try {
     const obj = JSON.parse(trimmed);
-    if (!obj || typeof obj.file !== 'string' || (obj.op !== 'read' && obj.op !== 'write')) {
+    const ops = ['read', 'write', 'search', 'bash'];
+    if (!obj || typeof obj.file !== 'string' || !ops.includes(obj.op)) {
       return null;
     }
     const num = (v: unknown): number | undefined =>
