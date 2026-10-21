@@ -28,7 +28,8 @@ export type TranscriptMeta =
   | { kind: 'pr'; number: number; url: string; repository: string }
   | { kind: 'cost'; costUSD: number; durationMs: number; linesAdded: number; linesRemoved: number }
   | { kind: 'spawn'; spawn: SpawnInfo }
-  | { kind: 'context'; cwd: string; gitBranch: string };
+  | { kind: 'context'; cwd: string; gitBranch: string }
+  | { kind: 'toolError'; tool: string }; // a tool call that failed (counts toward the drift signals)
 
 export interface ParsedRecord {
   ts: string;

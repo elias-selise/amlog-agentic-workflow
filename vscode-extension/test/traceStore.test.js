@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { SessionTrace, writeTrace, shareablePath, agentKey } = require('../out/transcript/traceStore.js');
+const { SessionTrace, writeTrace, shareablePath, agentKey, carrySymbols } = require('../out/transcript/traceStore.js');
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'amlog-trace-'));
 const ev = (over = {}) => ({
@@ -44,8 +44,9 @@ test('steps are recorded in the compact form and the home dir never leaks', () =
   assert.deepEqual([j.steps[1].query, j.steps[1].hits], ['foo', 3]);
   assert.equal(j.steps[2].file, '~/.config/x.json');
   assert.ok(!JSON.stringify(j).includes(home));
-  // never stores hit text or file contents
-  assert.ok(!('hitsList' in j.steps[1]) && !JSON.stringify(j.steps[1]).includes('src/a.ts'));
+  // a search keeps the paths it found, never the matched text or file contents
+  assert.deepEqual(j.steps[1].hitFiles, ['src/a.ts']);
+  assert.ok(!JSON.stringify(j.steps[1]).includes('text'));
 });
 
 test('credentials in captions, queries, details, titles and agent descriptions are masked and counted', () => {
@@ -179,4 +180,85 @@ test('a session with no issue folder goes to the fallback directory, or nowhere'
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).issue, null);
   assert.equal(writeTrace(t, undefined, new Map()), undefined);
   assert.equal(writeTrace(t, path.join(root, 'missing-parent', 'traces'), new Map()), undefined);
+});
+
+test('a search records the distinct files it found (capped, home dir hidden, credentials masked)', () => {
+  const home = os.homedir();
+  const t = new SessionTrace('s1');
+  const hits = [{ file: 'src/a.ts' }, { file: 'src/a.ts' }, { file: `${home}/proj/b.ts` }, { file: 'docs/ghp_abcdefghijklmnopqrstuvwxyz0123456789.md' }];
+  for (let i = 0; i < 40; i++) hits.push({ file: `src/f${i}.ts` });
+  t.addEvent(ev({ op: 'search', tool: 'grep', file: 'src', query: 'x', hitCount: hits.length, hits }));
+  const step = t.toJSON().steps[0];
+  assert.equal(step.hitFiles.length, 25);
+  assert.deepEqual(step.hitFiles.slice(0, 3), ['src/a.ts', '~/proj/b.ts', 'docs/[redacted].md']);
+  assert.ok(!JSON.stringify(step).includes(home));
+});
+
+test('a search whose results the log does not itemise has no hit data', () => {
+  const t = new SessionTrace('s1');
+  t.addEvent(ev({ op: 'search', tool: 'grep_search', file: 'src', query: 'x' }));
+  const step = t.toJSON().steps[0];
+  assert.equal(step.hits, undefined);
+  assert.equal(step.hitFiles, undefined);
+});
+
+test('failed tool calls are counted per agent', () => {
+  const t = new SessionTrace('s1');
+  t.addEvent(ev());
+  t.addMeta({ kind: 'toolError', tool: 'Bash' });
+  t.addMeta({ kind: 'toolError', tool: 'Read' });
+  t.addMeta({ kind: 'toolError', tool: 'shell' }, 'planner', 'p1');
+  const agents = Object.fromEntries(t.toJSON().agents.map((a) => [a.key, a.errors]));
+  assert.deepEqual(agents, { main: 2, 'planner:p1': 1 });
+  const clean = new SessionTrace('s2');
+  clean.addEvent(ev());
+  assert.equal(clean.toJSON().agents[0].errors, undefined);
+});
+
+test('symbols are resolved for live steps only, after the index has had time to catch up', () => {
+  const t = new SessionTrace('s1');
+  const asked = [];
+  const lookup = (abs, line) => { asked.push([abs, line]); return abs.endsWith('a.ts') ? 'Parser.parse' : undefined; };
+  t.addEvent(ev({ absFile: '/repo/src/a.ts', startLine: 12, endLine: 20 }), true);
+  t.addEvent(ev({ file: 'src/b.ts', absFile: '/repo/src/b.ts', startLine: 1, endLine: 2, ts: '2026-10-18T07:00:01.000Z' }), true);
+  t.addEvent(ev({ file: 'src/old.ts', absFile: '/repo/src/old.ts', startLine: 5, endLine: 6, ts: '2026-10-18T07:00:02.000Z' })); // history
+  t.addEvent(ev({ op: 'search', file: 'src', query: 'q', absFile: '/repo/src', startLine: 3 }), true); // not a file step
+  t.addEvent(ev({ file: 'src/c.ts', absFile: '/repo/src/c.ts', ts: '2026-10-18T07:00:03.000Z' }), true); // no line
+  assert.equal(t.hasPendingSymbols, true);
+  t.dirty = false;
+  t.resolveSymbols(lookup, false, Date.now() + 100);
+  assert.deepEqual(asked, [], 'too soon: the index may not have the edit yet');
+  t.resolveSymbols(lookup, false, Date.now() + 5000);
+  assert.deepEqual(asked, [['/repo/src/a.ts', 12], ['/repo/src/b.ts', 1]]);
+  assert.equal(t.dirty, true);
+  assert.equal(t.hasPendingSymbols, false);
+  const steps = t.toJSON().steps;
+  assert.equal(steps.find((s) => s.file === 'src/a.ts').symbol, 'Parser.parse');
+  assert.equal(steps.find((s) => s.file === 'src/b.ts').symbol, undefined);
+});
+
+test('force resolves pending symbols at once (shutdown)', () => {
+  const t = new SessionTrace('s1');
+  t.addEvent(ev({ absFile: '/repo/src/a.ts', startLine: 1, endLine: 1 }), true);
+  t.resolveSymbols(() => 'run', true);
+  assert.equal(t.toJSON().steps[0].symbol, 'run');
+});
+
+test('symbols already in the file survive a rebuild of the session from its log', () => {
+  const repo = tmp();
+  fs.mkdirSync(path.join(repo, 'docs', '4'), { recursive: true });
+  const file = path.join(repo, 'docs', '4', 'agent-trace.json');
+  const mk = () => {
+    const t = new SessionTrace('s');
+    t.addEvent(ev({ absFile: path.join(repo, 'docs/4/plan.md'), file: 'docs/4/plan.md', startLine: 3, endLine: 4 }), true);
+    return t;
+  };
+  const first = mk();
+  first.resolveSymbols(() => 'planSomething', true);
+  writeTrace(first, undefined, new Map());
+  writeTrace(mk(), undefined, new Map()); // rebuilt from the log after a restart: no symbol of its own
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).sessions.s.steps[0].symbol, 'planSomething');
+  // carrySymbols ignores junk
+  assert.doesNotThrow(() => carrySymbols(undefined, { steps: [] }));
+  assert.doesNotThrow(() => carrySymbols({ steps: 'x' }, { steps: [] }));
 });

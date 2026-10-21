@@ -5,6 +5,7 @@ import { AntigravitySource } from './antigravitySource';
 import { ClaudeSource } from './claudeSource';
 import { CodexSource } from './codexSource';
 import { SessionSource, TailSpec } from './source';
+import { SymbolIndex } from './symbols';
 import { SessionTrace, writeTrace } from './traceStore';
 
 // Follows the session logs of every enabled agent (Claude Code, Codex,
@@ -22,6 +23,7 @@ export interface WatcherOptions {
   lookbackMs: number; // replay sessions active within this window at startup
   pollMs: number;
   sources?: string[]; // which agents to follow (default: all)
+  symbols?: boolean; // name the function around live steps from the CodeGraph index (default: true)
   traceFallbackDir?: string; // where traces go when no docs/<issue>/ is found
   writeTraces: boolean;
   onEvent: (event: ActivityEvent, live: boolean) => void;
@@ -50,6 +52,7 @@ export class SessionWatcher {
   private readonly sessions = new Set<string>(); // sessions whose main log is tailed
   private readonly startedAt = Date.now();
   private readonly lastWritten = new Map<string, string>();
+  private readonly symbolIndex?: SymbolIndex;
   private readonly pollTimer: ReturnType<typeof setInterval>;
   private readonly flushTimer: ReturnType<typeof setInterval>;
 
@@ -65,6 +68,9 @@ export class SessionWatcher {
     }
     if (want.has('antigravity')) {
       this.sources.push(new AntigravitySource(opts.root));
+    }
+    if (opts.symbols !== false) {
+      this.symbolIndex = new SymbolIndex();
     }
     this.scan();
     this.pollTimer = setInterval(() => this.scan(), opts.pollMs);
@@ -200,27 +206,31 @@ export class SessionWatcher {
         continue;
       }
       for (const meta of parsed.meta) {
-        trace.addMeta(meta);
+        trace.addMeta(meta, tail.agent, tail.agentId);
       }
       if (parsed.usage) {
         trace.addUsage(tail.agent, tail.agentId, parsed.usage, parsed.ts);
       }
       for (const ev of parsed.events) {
-        trace.addEvent(ev);
         // Backlog replays quietly; anything that happened after the extension
         // started (or arrives in a later read) is live.
         const live = tail.drainedOnce || Date.parse(ev.ts) >= this.startedAt;
+        trace.addEvent(ev, live && !!this.symbolIndex);
         this.opts.onEvent(ev, live);
       }
     }
     tail.drainedOnce = true;
   }
 
-  private flush(): void {
+  private flush(force = false): void {
     if (!this.opts.writeTraces) {
       return;
     }
+    const index = this.symbolIndex;
     for (const trace of this.traces.values()) {
+      if (index && trace.hasPendingSymbols) {
+        trace.resolveSymbols((abs, line) => index.lookup(abs, line), force);
+      }
       if (!trace.dirty) {
         continue;
       }
@@ -239,6 +249,7 @@ export class SessionWatcher {
   dispose(): void {
     clearInterval(this.pollTimer);
     clearInterval(this.flushTimer);
-    this.flush();
+    this.flush(true);
+    this.symbolIndex?.dispose();
   }
 }

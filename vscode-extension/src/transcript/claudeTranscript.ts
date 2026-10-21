@@ -155,6 +155,9 @@ export class ClaudeTranscriptParser implements RecordParser {
         continue;
       }
       this.pending.delete(id);
+      if (block.is_error === true) {
+        out.meta.push({ kind: 'toolError', tool: tool.name });
+      }
       // toolUseResult belongs to the record; trust it only when the record
       // carries a single result.
       const tur = results.length === 1 && isObj(rec.toolUseResult) ? rec.toolUseResult : {};

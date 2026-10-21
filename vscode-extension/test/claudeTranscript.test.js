@@ -274,3 +274,20 @@ test('unknown or malformed records are skipped without throwing', () => {
     assert.deepEqual(out.events, []);
   }
 });
+
+test('failed tool calls are reported so they can be counted', () => {
+  const { meta } = run(parser(), [
+    assistant([toolUse('t1', 'Read', { file_path: '/ws/missing.ts' }), toolUse('t2', 'Bash', { command: 'false' })]),
+    result('t1', 'File does not exist', 'Error: nope', {}, true),
+    result('t2', 'exit 1', { stdout: '' }, {}, true),
+  ]);
+  assert.deepEqual(meta.filter((m) => m.kind === 'toolError').map((m) => m.tool), ['Read', 'Bash']);
+});
+
+test('CodeGraph explore calls are searches without hit data', () => {
+  const { events } = run(parser(), [
+    assistant([text('Map the area first.'), toolUse('t1', 'mcp__codegraph__codegraph_explore', { query: 'how do links work', projectPath: '/ws' })]),
+    result('t1', 'long answer', undefined),
+  ]);
+  assert.deepEqual([events[0].op, events[0].tool, events[0].query, events[0].hitCount, events[0].caption], ['search', 'codegraph_explore', 'how do links work', undefined, 'Map the area first.']);
+});

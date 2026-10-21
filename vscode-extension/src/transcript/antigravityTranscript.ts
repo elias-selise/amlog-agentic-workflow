@@ -187,7 +187,11 @@ export class AntigravityTranscriptParser implements RecordParser {
         const cwd = str(a.Cwd) || this.root;
         const exit = result ? /exited with code (-?\d+)/.exec(result) : null;
         const body = result ? result.split(/\n?Output:\r?\n/).slice(1).join('\nOutput:\n') : '';
-        events.push(...shellEvents(this.b, [{ command, cwd }], body, !!exit && exit[1] !== '0', id, ts, str(a.toolSummary)));
+        const failed = !!exit && exit[1] !== '0';
+        if (failed) {
+          out.meta.push({ kind: 'toolError', tool: 'shell' });
+        }
+        events.push(...shellEvents(this.b, [{ command, cwd }], body, failed, id, ts, str(a.toolSummary)));
         break;
       }
       case 'grep_search': {

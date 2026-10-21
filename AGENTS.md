@@ -226,6 +226,11 @@ package).
   queries/hit counts, captions and metrics, never file contents or tool output.
   Free text is passed through a credential redactor (`[redacted]`; `redactions`
   counts them) and the home directory is written as `~`.
+  The trace is a local file: `amlog install`/`update` gitignore
+  `docs/*/agent-trace.json` and `.html` (delete those two `.gitignore` lines to
+  share them through git instead). The extension can replay it with phases, what
+  led to each step and drift signals, jump to the steps behind a selected piece of
+  code, and copy a markdown summary for a PR description.
   Sessions with no issue folder go to `.amlog/traces/<session>.json`.
 - **Output:** one NDJSON line per file touch appended to
   `.amlog/activity/events.ndjson` (gitignored, size-rotated):
