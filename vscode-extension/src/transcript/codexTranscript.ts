@@ -195,7 +195,11 @@ export class CodexTranscriptParser implements RecordParser {
     if (call.kind === 'shell' && call.cmds) {
       const exit = /(?:Process exited with code|Exit code:)\s*(-?\d+)/.exec(text);
       const body = text.split(/\n?Output:\r?\n/).slice(1).join('\nOutput:\n') || text;
-      events.push(...shellEvents(this.b, call.cmds, body, !!exit && exit[1] !== '0', id, ts));
+      const failed = !!exit && exit[1] !== '0';
+      if (failed) {
+        out.meta.push({ kind: 'toolError', tool: 'shell' });
+      }
+      events.push(...shellEvents(this.b, call.cmds, body, failed, id, ts));
     } else if (call.kind === 'search') {
       const root = this.b.abs(this.cwd, call.projectPath || '.');
       if (!this.b.isNoise(root)) {

@@ -154,3 +154,10 @@ test('other step types, unknown tools and garbage are skipped without throwing',
     assert.deepEqual(p.feed(r).events, []);
   }
 });
+
+test('a run_command that exits non-zero is reported as a failed tool call', () => {
+  const p = new AntigravityTranscriptParser(ROOT, 'conv-1');
+  p.feed(planner([tc('run_command', { CommandLine: 'npm test', Cwd: '/ws' })]));
+  const out = p.feed(generic('\nThe command exited with code 2.\nOutput:\nfailed\n'));
+  assert.deepEqual(out.meta.filter((m) => m.kind === 'toolError'), [{ kind: 'toolError', tool: 'shell' }]);
+});

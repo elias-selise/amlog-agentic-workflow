@@ -9,6 +9,7 @@
   const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
   if (typeof acquireVsCodeApi === 'function') { document.documentElement.setAttribute('data-vscode', ''); }
 
+  const TA = window.TraceAnalysis; // phases, edges, drift, flow (media/traceAnalysis.js)
   const OPS = ['read', 'write', 'search', 'bash'];
   const OP_LABEL = { read: 'read', write: 'edit', search: 'search', bash: 'command' };
   const OP_RGB = { read: '120,170,230', write: '230,150,90', search: '180,130,230', bash: '150,150,150' };
@@ -44,6 +45,9 @@
   let opsOff = new Set();
   let timer = 0;
   let lanes = [];
+  let analysis = null;   // { phases, edges, drift } over ALL steps of the session
+  let openedBy = new Map(); // step index -> the search that led to it
+  let ctxOf = new Map();    // edit step index -> reads/searches behind it
 
   const scrub = /** @type {HTMLInputElement} */ ($('scrub'));
   const canvas = /** @type {HTMLCanvasElement} */ ($('timeline'));
@@ -72,7 +76,12 @@
     session = doc.sessions[sessionId];
     steps = (session.steps || []).map((s, i) => Object.assign({ i }, s));
     agentsOff = new Set(Array.from(agentsOff).filter((a) => session.agents.some((x) => x.key === a)));
+    analysis = TA ? { phases: TA.phases(steps), edges: TA.edges(steps), drift: TA.drift(steps, session.agents) } : null;
+    openedBy = new Map(analysis ? analysis.edges.opened.map((o) => [o.step, o]) : []);
+    ctxOf = new Map(analysis ? analysis.edges.context.map((c) => [c.write, c]) : []);
     renderHeader();
+    renderPhases();
+    renderInsights();
     renderFilters();
     rebuild(restoreAt);
   }
@@ -203,8 +212,17 @@
     if (!noScroll && rows[cur]) { rows[cur].scrollIntoView({ block: 'center' }); }
     renderNow();
     renderFiles();
+    markPhase();
+    if (!$('flow').classList.contains('hidden')) { renderFlow(); }
     drawTimeline();
   }
+
+  // index in the filtered view of the first step at or after an original step index
+  function viewIndexFor(stepIdx) {
+    const k = view.findIndex((s) => s.i >= stepIdx);
+    return k < 0 ? Math.max(0, view.length - 1) : k;
+  }
+  const baseName = (f) => String(f).split('/').pop() || f;
 
   function renderNow() {
     const s = view[cur];
@@ -217,9 +235,141 @@
       + `<span class="op-tag ${esc(s.op)}">${esc(OP_LABEL[s.op] || s.op)}</span><span class="when">${esc(clock(s.t))}</span></div>`
       + (s.op === 'search' ? `<div class="now-file mono">⌕ ${esc(s.query || '')}</div><div class="now-detail">${s.hits === undefined ? 'results not recorded' : `${s.hits} hit(s)`} in ${esc(s.file)}</div>`
         : s.op === 'bash' ? `<div class="now-file mono">${esc(s.detail || '')}</div>`
-          : `<div class="now-file mono">${esc(s.file)}${esc(lines)}</div><div class="now-detail">${esc(s.detail || '')}</div>`)
-      + (s.caption ? `<div class="quote">“${esc(s.caption)}”</div>` : '');
+          : `<div class="now-file mono">${esc(s.file)}${esc(lines)}</div><div class="now-detail">${esc(s.detail || '')}${s.symbol ? ` · in <span class="mono">${esc(s.symbol)}</span>` : ''}</div>`)
+      + (s.caption ? `<div class="quote">“${esc(s.caption)}”</div>` : '')
+      + whyHtml(s);
   }
+
+  // What led to this step: the search whose result it opened, and for an edit
+  // the files read since the agent's previous edit.
+  function whyHtml(s) {
+    let html = '';
+    const o = openedBy.get(s.i);
+    if (o) {
+      const q = steps[o.search];
+      html += `<div class="why"><b>Led here by</b> <a data-seek="${o.search}">⌕ ${esc(q.query || 'search')}</a> <span class="muted">${s.i - o.search} step(s) earlier</span></div>`;
+    }
+    const c = ctxOf.get(s.i);
+    if (c && (c.reads.length || c.searches.length)) {
+      const reads = c.reads.map((r) => `<a data-seek="${r.step}" class="mono" title="${esc(r.file)}">${esc(baseName(r.file))}</a>`);
+      const searches = c.searches.map((i) => `<a data-seek="${i}">⌕ ${esc(steps[i].query || 'search')}</a>`);
+      html += `<div class="why"><b>Context for this edit</b> ${searches.concat(reads).join(' · ')}</div>`;
+    }
+    return html;
+  }
+  $('now').addEventListener('click', (e) => {
+    const a = /** @type {HTMLElement} */ (e.target).closest('[data-seek]');
+    if (a) { stop(); seek(viewIndexFor(Number(a.getAttribute('data-seek'))), false); }
+  });
+
+  // ---- phases band ----
+  function renderPhases() {
+    const el = $('phases');
+    if (!analysis || !analysis.phases.length) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    el.innerHTML = analysis.phases.map((p, k) => {
+      const dur = p.activeMs ? fmtDur(p.activeMs) : `${p.count} steps`;
+      const tip = `${p.kind}: ${p.count} steps, ${dur} active, ${p.reads} reads, ${p.writes} edits, ${p.searches} searches` + (p.topFiles.length ? `\n${p.topFiles.join('\n')}` : '');
+      return `<div class="ph ${p.kind}" data-ph="${k}" style="flex:${Math.max(p.count, 6)}" title="${esc(tip)}"><span>${esc(p.kind)}</span><i>${esc(dur)}</i></div>`;
+    }).join('');
+    markPhase();
+  }
+  $('phases').addEventListener('click', (e) => {
+    const el = /** @type {HTMLElement} */ (e.target).closest('[data-ph]');
+    if (el && analysis) { stop(); seek(viewIndexFor(analysis.phases[Number(el.getAttribute('data-ph'))].from), false); }
+  });
+  function markPhase() {
+    if (!analysis || !view[cur]) { return; }
+    const at = view[cur].i;
+    $('phases').querySelectorAll('.ph').forEach((el, k) => {
+      const p = analysis.phases[k];
+      el.classList.toggle('cur', !!p && at >= p.from && at <= p.to);
+    });
+  }
+
+  // ---- worth a look ----
+  function renderInsights() {
+    const box = $('insights-box');
+    const list = analysis ? analysis.drift : [];
+    box.classList.toggle('hidden', !list.length);
+    if (!list.length) { return; }
+    $('insights-title').textContent = `Worth a look (${list.length})`;
+    $('insights').innerHTML = list.map((d) =>
+      `<div class="insight ${d.level}${d.steps.length ? ' go' : ''}"${d.steps.length ? ` data-seek="${d.steps[0]}"` : ''}>`
+      + `<i></i><div><div>${esc(d.title)}</div><div class="muted">${esc(d.detail || '')}</div></div></div>`).join('');
+  }
+  $('insights').addEventListener('click', (e) => {
+    const a = /** @type {HTMLElement} */ (e.target).closest('[data-seek]');
+    if (a) { stop(); seek(viewIndexFor(Number(a.getAttribute('data-seek'))), false); }
+  });
+
+  // ---- tabs + flow ----
+  document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => {
+    const tab = b.getAttribute('data-tab');
+    document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('on', x === b));
+    $('steps').classList.toggle('hidden', tab !== 'steps');
+    $('flow').classList.toggle('hidden', tab !== 'flow');
+    if (tab === 'flow') { renderFlow(); }
+  }));
+
+  // queries -> files read -> files edited, as of the current step
+  function renderFlow() {
+    const el = $('flow');
+    if (!TA || !view[cur]) { el.innerHTML = ''; return; }
+    const f = TA.flow(steps, view[cur].i);
+    if (!f.reads.length && !f.writes.length) { el.innerHTML = '<div class="now-detail" style="padding:16px">Nothing read or edited yet.</div>'; return; }
+    const W = Math.max(520, el.clientWidth - 8);
+    const colW = Math.max(150, Math.min(270, (W - 40) / 3));
+    const X = { q: 8, r: (W - colW) / 2, w: W - colW - 8 };
+    const ROW = 26;
+    const cols = { q: f.queries, r: f.reads, w: f.writes };
+    const pos = new Map();
+    for (const k of ['q', 'r', 'w']) {
+      cols[k].forEach((n, i) => pos.set(n.id, { x: X[k], y: 30 + i * ROW, col: k }));
+    }
+    const H = 30 + Math.max(f.queries.length, f.reads.length, f.writes.length) * ROW + 10;
+    const chars = Math.floor((colW - 38) / 6.3);
+    const cut = (t, n) => (t.length > n ? `…${t.slice(t.length - n + 1)}` : t);
+    const cutHead = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+    const links = f.links.filter((l) => pos.has(l.from) && pos.has(l.to)).map((l) => {
+      const a = pos.get(l.from);
+      const b = pos.get(l.to);
+      const x1 = a.x + colW;
+      const y1 = a.y + 10;
+      const x2 = b.x;
+      const y2 = b.y + 10;
+      const dx = (x2 - x1) / 2;
+      return `<path class="link ${l.kind}" data-a="${esc(l.from)}" data-b="${esc(l.to)}" stroke-width="${1 + Math.min(3, l.w - 1)}" d="M${x1} ${y1} C${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}"></path>`;
+    }).join('');
+    const node = (n, col, label, sub, fill) => {
+      const p = pos.get(n.id);
+      return `<g class="node" data-id="${esc(n.id)}"${n.file ? ` data-file="${esc(n.file)}"` : ''}><title>${esc(n.file || label)}${n.symbol ? ` · ${esc(n.symbol)}` : ''}</title>`
+        + `<rect x="${p.x}" y="${p.y}" width="${colW}" height="20" rx="4" fill="${fill}"></rect>`
+        + `<text x="${p.x + 7}" y="${p.y + 14}">${esc(label)}</text><text class="n" x="${p.x + colW - 6}" y="${p.y + 14}" text-anchor="end">${esc(sub)}</text></g>`;
+    };
+    const nodes = f.queries.map((n) => node(n, 'q', cutHead(n.label, chars), `${n.n}→`, 'rgba(180,130,230,0.22)')).join('')
+      + f.reads.map((n) => node(n, 'r', cut(n.file, chars), `${n.n}×`, 'rgba(120,170,230,0.2)')).join('')
+      + f.writes.map((n) => node(n, 'w', n.symbol ? cutHead(n.symbol, chars) : cut(n.file, chars), `${n.n}✎`, 'rgba(230,150,90,0.24)')).join('');
+    const head = `<text class="col" x="${X.q}" y="16">Searches that led somewhere</text><text class="col" x="${X.r}" y="16">Files read</text><text class="col" x="${X.w}" y="16">Files edited</text>`;
+    el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${head}${links}${nodes}</svg>`
+      + '<div class="now-detail" style="padding:6px 12px">Purple lines: a search led to opening that file. Blue lines: files read before an edit. Click a file to jump to its latest step.</div>';
+  }
+  $('flow').addEventListener('mouseover', (e) => {
+    const g = /** @type {HTMLElement} */ (e.target).closest('.node');
+    const svg = $('flow').querySelector('svg');
+    if (!svg) { return; }
+    const id = g ? g.getAttribute('data-id') : null;
+    svg.classList.toggle('dim', !!id);
+    svg.querySelectorAll('.link').forEach((l) => l.classList.toggle('hl', !!id && (l.getAttribute('data-a') === id || l.getAttribute('data-b') === id)));
+  });
+  $('flow').addEventListener('click', (e) => {
+    const g = /** @type {HTMLElement} */ (e.target).closest('.node');
+    const file = g && g.getAttribute('data-file');
+    if (!file) { return; }
+    for (let i = cur; i >= 0; i--) {
+      if (view[i].file === file && (view[i].op === 'read' || view[i].op === 'write')) { stop(); seek(i, false); return; }
+    }
+  });
 
   // files read/edited up to the current step
   function renderFiles() {
@@ -343,7 +493,33 @@
   window.addEventListener('message', (e) => {
     const msg = e.data;
     if (msg && msg.type === 'trace') { load(msg.doc, !!msg.keep); }
+    if (msg && msg.type === 'seek' && doc) { jumpTo(msg); }
   });
+
+  // Open a given step (from "show the agent trace for this line").
+  function jumpTo(msg) {
+    if (msg.session && doc.sessions[msg.session] && msg.session !== sessionId) {
+      sessionId = msg.session;
+      /** @type {HTMLSelectElement} */ ($('session')).value = sessionId;
+      agentsOff.clear();
+      opsOff.clear();
+      openSession(null);
+    } else if (agentsOff.size || opsOff.size) {
+      agentsOff.clear();
+      opsOff.clear();
+      renderFilters();
+      rebuild(null);
+    }
+    // Several steps of one tool call share a timestamp, so match as precisely as
+    // the message allows, then loosen.
+    const same = (s, strict) => s.t === msg.t && (!msg.agent || s.agent === msg.agent)
+      && (!strict || ((!msg.op || s.op === msg.op) && (!msg.file || s.file === msg.file)));
+    let at = view.findIndex((s) => same(s, true));
+    if (at < 0) { at = view.findIndex((s) => same(s, false)); }
+    if (at < 0) { at = view.findIndex((s) => s.t >= msg.t); }
+    stop();
+    seek(at < 0 ? 0 : at, false);
+  }
   if (window.__TRACE__) {
     $('export').classList.add('hidden');
     load(window.__TRACE__, false);

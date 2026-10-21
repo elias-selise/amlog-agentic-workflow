@@ -86,7 +86,30 @@ Limits per agent, from what each log contains:
   **timeline with one lane per agent** you can scrub or play, the agent's words
   at each step, and the files read/edited so far. Idle gaps over 30 minutes are
   marked, ops and agents can be filtered, and it follows the file live while an
-  agent is still running.
+  agent is still running. On top of the raw steps it works out:
+  - **Phases** (explore / plan / implement / verify / ship) as a band above the
+    timeline: click one to jump there. Inferred from the agents' roles, what they
+    edited and which commands they ran, so treat them as a guide, not a log.
+  - **What led to each step**: "Led here by ⌕ query" when a step opens a file a
+    search found, and "Context for this edit" listing the files read since the
+    agent's previous edit. Each is a link.
+  - **Worth a look**: files read or rewritten again and again, runs of searches
+    that found nothing, repeated queries, failed tool calls per agent, long idle
+    time. Pointers, not verdicts; plan/notes files are not counted as churn.
+  - **Flow** tab: queries → files read → files edited, as of the current step
+    (purple: a search led to the file; blue: read before an edit).
+  - **Symbols**: for steps captured live, the function/class around the lines
+    ("edited `parseInvoice`"), from the repo's CodeGraph index (needs Node 22+ in
+    VS Code and an index; silently off otherwise). The names are kept when the
+    trace is rebuilt after a restart; steps replayed from history are not named,
+    because the index describes today's code.
+- **Show Agent Trace for This Code** (editor context menu, `AMLOG: Show Agent
+  Trace for This Code`): pick the steps from any recorded trace that edited (or
+  read) the selected lines, and the replay opens at that step with the agent's
+  reason. This is the answer to "why is this line like this?".
+- **Copy Trace Summary for PR** (`AMLOG: Copy Trace Summary for PR`): a short
+  markdown summary (agents, phases, edited files with symbols, what is worth a
+  look) on the clipboard, to paste into a PR description if you want one.
 - **Export HTML** (`AMLOG: Export Trace as HTML`, or the button in the replay):
   writes `agent-trace.html` next to the JSON, one self-contained file a PR
   reviewer can open in any browser without the extension.
@@ -120,8 +143,8 @@ Limits per agent, from what each log contains:
 ```
 
 Paths outside the workspace are written with `~` instead of your home directory.
-It records paths, line ranges, search queries and hit counts, one-line captions
-and metrics. It **never** stores file contents or tool output.
+It records paths, line ranges, search queries, hit counts and the *paths* a search
+found, one-line captions, failed-call counts and metrics. It **never** stores file contents or tool output.
 
 **Credentials are masked.** Free text (captions, shell commands, search queries,
 agent descriptions, the title) goes through `src/transcript/redact.ts` before it is
@@ -146,6 +169,7 @@ a trace before sharing it outside the team.
 | `amlog.captureSource` | `transcript` | `transcript` (full detail, hook as fallback) or `hook` (hook file only). Reload after changing. |
 | `amlog.sessionLookbackMinutes` | `60` | On startup, replay sessions active within this window. |
 | `amlog.writeTraceFile` | `true` | Write `docs/<issue>/agent-trace.json` (or `.amlog/traces/`). |
+| `amlog.resolveSymbols` | `true` | Name the function/class around live steps from the repo's CodeGraph index. Reload after changing. |
 | `amlog.showDecorations` | `true` | Show the gutter spider / line highlight. |
 | `amlog.decorationTtlMs` | `4000` | How long the gutter spider lingers before fading. |
 | `amlog.autoRevealOnWrite` | `false` | Open a file in an editor when an agent writes it. |
@@ -188,3 +212,11 @@ attribution), the transcript parser, the trace store (merging, privacy,
 redaction), the live player's pacing and the watcher's tailing. The tests use
 synthetic transcript records (`test/helpers.js`) because real transcripts contain
 private code and prompts.
+
+### Trace files stay local
+
+`amlog install` / `amlog update` add `docs/*/agent-trace.json` and
+`docs/*/agent-trace.html` to the workspace's `.gitignore`: the trace is for the
+developer looking at how an agent worked, not something the PR needs, and this
+stops an agent's commit step from picking it up. To share traces through git
+instead, delete those two lines.

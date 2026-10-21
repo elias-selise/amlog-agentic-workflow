@@ -36,6 +36,7 @@ interface AgentInfo {
   firstTs: string;
   lastTs: string;
   steps: number;
+  errors: number; // failed tool calls
 }
 
 interface Step {
@@ -47,8 +48,15 @@ interface Step {
   detail?: string;
   query?: string;
   hits?: number;
+  hitFiles?: string[]; // distinct files a search found (paths only)
+  symbol?: string; // function/class around the lines, from the CodeGraph index (live steps)
   caption?: string;
 }
+
+// A step waits this long before its symbol is looked up, so the CodeGraph index
+// has caught up with the edit.
+const SYMBOL_DELAY_MS = 1500;
+const MAX_HIT_FILES = 25;
 
 // Paths outside the workspace are absolute; keep the home directory (and so the
 // user name) out of a file that gets shared in a PR.
@@ -76,6 +84,7 @@ export class SessionTrace {
   private readonly steps: Step[] = [];
   private readonly docsVotes = new Map<string, number>();
   private readonly redactor = new Redactor();
+  private pendingSymbols: { step: Step; abs: string; line: number; at: number }[] = [];
 
   constructor(readonly sessionId: string) {}
 
@@ -92,7 +101,7 @@ export class SessionTrace {
   private agentFor(key: string, type: string, id: string, ts: string): AgentInfo {
     let a = this.agents.get(key);
     if (!a) {
-      a = { key, type, id, description: '', firstTs: ts, lastTs: ts, steps: 0 };
+      a = { key, type, id, description: '', firstTs: ts, lastTs: ts, steps: 0, errors: 0 };
       this.agents.set(key, a);
     }
     if (ts < a.firstTs) {
@@ -113,7 +122,7 @@ export class SessionTrace {
     }
   }
 
-  addEvent(ev: ActivityEvent): void {
+  addEvent(ev: ActivityEvent, live = false): void {
     this.touch(ev.ts);
     const key = agentKey(ev.agent, ev.agentId);
     const agent = this.agentFor(key, ev.agent, ev.agentId, ev.ts);
@@ -130,11 +139,18 @@ export class SessionTrace {
       if (ev.hitCount !== undefined) {
         step.hits = ev.hitCount; // absent when the agent's log doesn't say what it found
       }
+      const files = [...new Set((ev.hits ?? []).map((h) => this.redactor.text(shareablePath(h.file))))].slice(0, MAX_HIT_FILES);
+      if (files.length) {
+        step.hitFiles = files;
+      }
     }
     if (ev.caption) {
       step.caption = this.redactor.text(ev.caption);
     }
     this.steps.push(step);
+    if (live && ev.absFile && ev.startLine !== undefined && (ev.op === 'read' || ev.op === 'write')) {
+      this.pendingSymbols.push({ step, abs: ev.absFile, line: ev.startLine, at: Date.now() });
+    }
 
     const m = ev.absFile ? DOCS_FILE.exec(ev.absFile) : null;
     if (m) {
@@ -151,8 +167,10 @@ export class SessionTrace {
     this.usage.set(sample.messageId, { agent: agentKey(agent, agentId), sample });
   }
 
-  addMeta(meta: TranscriptMeta): void {
-    if (meta.kind === 'title') {
+  addMeta(meta: TranscriptMeta, agent = 'main', agentId = ''): void {
+    if (meta.kind === 'toolError') {
+      this.agentFor(agentKey(agent, agentId), agent, agentId, this.lastTs || new Date().toISOString()).errors++;
+    } else if (meta.kind === 'title') {
       this.title = this.redactor.text(meta.title);
     } else if (meta.kind === 'pr') {
       this.pr = { number: meta.number, url: meta.url, repository: meta.repository };
@@ -165,6 +183,28 @@ export class SessionTrace {
       this.describeAgent(meta.spawn.agentType, meta.spawn.agentId, meta.spawn.description);
     }
     this.dirty = true;
+  }
+
+  // Look up the symbol around each recent live step. `force` resolves everything
+  // pending (used on shutdown); otherwise a step waits for the index to catch up.
+  resolveSymbols(lookup: (abs: string, line: number) => string | undefined, force = false, now = Date.now()): void {
+    const keep: SessionTrace['pendingSymbols'] = [];
+    for (const p of this.pendingSymbols) {
+      if (!force && now - p.at < SYMBOL_DELAY_MS) {
+        keep.push(p);
+        continue;
+      }
+      const symbol = lookup(p.abs, p.line);
+      if (symbol) {
+        p.step.symbol = this.redactor.text(symbol);
+        this.dirty = true;
+      }
+    }
+    this.pendingSymbols = keep;
+  }
+
+  get hasPendingSymbols(): boolean {
+    return this.pendingSymbols.length > 0;
   }
 
   // The issue's docs folder this session worked in: the `docs/<n>/` it touched
@@ -225,6 +265,7 @@ export class SessionTrace {
           endedAt: a.lastTs,
           durationMs: ms(a.firstTs, a.lastTs),
           steps: a.steps,
+          errors: a.errors || undefined,
           tokens: tokensByAgent.get(a.key) ?? {},
         })),
       steps: [...this.steps].sort((a, b) => a.t.localeCompare(b.t)),
@@ -248,6 +289,7 @@ export function writeTrace(trace: SessionTrace, fallbackDir: string | undefined,
     file = path.join(docs, TRACE_FILE);
     const existing = readJson(file);
     const sessions = existing && existing.schema === SCHEMA && isRecord(existing.sessions) ? existing.sessions : {};
+    carrySymbols(sessions[trace.sessionId], session);
     sessions[trace.sessionId] = session;
     doc = { schema: SCHEMA, issue: path.basename(docs), sessions: sortByStart(sessions) };
   } else if (fallbackDir && isDir(path.dirname(fallbackDir))) {
@@ -267,6 +309,26 @@ export function writeTrace(trace: SessionTrace, fallbackDir: string | undefined,
   fs.renameSync(tmp, file);
   lastWritten.set(file, text);
   return file;
+}
+
+// Symbols are looked up while a step is live; when the session is later rebuilt
+// from its log (a restart), keep the ones already in the file.
+export function carrySymbols(previous: unknown, session: Record<string, unknown>): void {
+  if (!isRecord(previous) || !Array.isArray(previous.steps) || !Array.isArray(session.steps)) {
+    return;
+  }
+  const key = (s: Record<string, unknown>) => `${s.t}|${s.agent}|${s.file}|${Array.isArray(s.lines) ? s.lines.join('-') : ''}`;
+  const known = new Map<string, string>();
+  for (const s of previous.steps) {
+    if (isRecord(s) && typeof s.symbol === 'string') {
+      known.set(key(s), s.symbol);
+    }
+  }
+  for (const s of session.steps) {
+    if (isRecord(s) && s.symbol === undefined && known.has(key(s))) {
+      s.symbol = known.get(key(s));
+    }
+  }
 }
 
 function isDir(p: string): boolean {

@@ -225,3 +225,54 @@ test('amlog.agentSources limits which agents are read', async () => {
     w2.dispose();
   }
 });
+
+test('live edits get the function name from the repo\'s CodeGraph index; history and opted-out runs do not', async () => {
+  const ws = path.join(base, 'symrepo');
+  fs.mkdirSync(path.join(ws, 'docs', '9'), { recursive: true });
+  fs.mkdirSync(path.join(ws, '.codegraph'), { recursive: true });
+  const { DatabaseSync } = require('node:sqlite');
+  const db = new DatabaseSync(path.join(ws, '.codegraph', 'codegraph.db'));
+  db.exec('CREATE TABLE nodes (id TEXT, kind TEXT, name TEXT, qualified_name TEXT, file_path TEXT, start_line INTEGER, end_line INTEGER)');
+  db.prepare('INSERT INTO nodes VALUES (?, ?, ?, ?, ?, ?, ?)').run('1', 'function', 'doThing', 'doThing', 'src/a.ts', 1, 50);
+  db.close();
+
+  const pd = projectDirFor(ws);
+  fs.mkdirSync(pd, { recursive: true });
+  const main = path.join(pd, 'sym-1.jsonl');
+  const edit = (id, file, line, ts) => [
+    { ...assistant([toolUse(id, 'Edit', { file_path: file })]), timestamp: ts },
+    { ...result(id, 'ok', { filePath: file, structuredPatch: [{ oldStart: line, oldLines: 1, newStart: line, newLines: 1, lines: ['-a', '+b'] }] }), timestamp: ts },
+  ];
+  // history: an old edit that must not be named from today's index
+  append(main, edit('h1', path.join(ws, 'src/a.ts'), 5, '2020-01-01T00:00:00.000Z'));
+
+  const run = async (symbols) => {
+    const got = [];
+    const w = new SessionWatcher({
+      root: ws, lookbackMs: 3600e3, pollMs: 40, writeTraces: true, symbols, sources: ['claude'],
+      traceFallbackDir: path.join(ws, '.amlog', 'traces'), onEvent: (e) => got.push(e),
+    });
+    try {
+      await until(() => got.length >= 1);
+      append(main, [
+        ...edit(`l${symbols}`, path.join(ws, 'src/a.ts'), 12, new Date().toISOString()),
+        ...edit(`p${symbols}`, path.join(ws, 'docs/9/plan.md'), 1, new Date().toISOString()),
+      ]);
+      await until(() => got.length >= 3);
+    } finally {
+      w.dispose(); // forces pending symbol lookups, then writes the trace
+    }
+    return JSON.parse(fs.readFileSync(path.join(ws, 'docs', '9', 'agent-trace.json'), 'utf8')).sessions['sym-1'].steps;
+  };
+
+  const on = await run(true);
+  const live = on.filter((s) => s.file === 'src/a.ts' && s.lines[0] === 12);
+  assert.equal(live.length, 1);
+  assert.equal(live[0].symbol, 'doThing');
+  assert.equal(on.find((s) => s.file === 'src/a.ts' && s.lines[0] === 5).symbol, undefined, 'history is not named');
+  assert.equal(on.find((s) => s.file === 'docs/9/plan.md').symbol, undefined, 'no node covers a plan file');
+
+  // a restart rebuilds the session from the log; the names found live are kept
+  const again = await run(false);
+  assert.equal(again.find((s) => s.file === 'src/a.ts' && s.lines[0] === 12).symbol, 'doThing');
+});

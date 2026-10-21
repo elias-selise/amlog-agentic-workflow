@@ -105,6 +105,7 @@ export function activate(context: vscode.ExtensionContext): void {
       lookbackMs: Math.max(0, config().get<number>('sessionLookbackMinutes', 60)) * 60_000,
       pollMs: TRANSCRIPT_POLL_MS,
       sources: config().get<string[]>('agentSources', ['claude', 'codex', 'antigravity']),
+      symbols: config().get<boolean>('resolveSymbols', true),
       writeTraces: config().get<boolean>('writeTraceFile', true),
       traceFallbackDir: path.join(amlogDir.fsPath, 'traces'),
       onEvent,
@@ -147,6 +148,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
     vscode.commands.registerCommand('amlog.openTraceReplay', () => ReplayPanel.show(context, root)),
     vscode.commands.registerCommand('amlog.exportTraceHtml', () => ReplayPanel.exportHtml(context, root)),
+    vscode.commands.registerCommand('amlog.showTraceForSelection', () => ReplayPanel.showForSelection(context, root)),
+    vscode.commands.registerCommand('amlog.copyTraceSummary', () => ReplayPanel.copySummary(context, root)),
     vscode.commands.registerCommand('amlog.toggleDecorations', async () => {
       const next = !config().get<boolean>('showDecorations', true);
       await config().update('showDecorations', next, vscode.ConfigurationTarget.Workspace);
@@ -170,7 +173,7 @@ export function activate(context: vscode.ExtensionContext): void {
         state.setTrailLength(config().get<number>('trailLength', 8));
       }
       if (e.affectsConfiguration('amlog.captureSource') || e.affectsConfiguration('amlog.writeTraceFile')
-        || e.affectsConfiguration('amlog.sessionLookbackMinutes') || e.affectsConfiguration('amlog.agentSources')) {
+        || e.affectsConfiguration('amlog.sessionLookbackMinutes') || e.affectsConfiguration('amlog.agentSources') || e.affectsConfiguration('amlog.resolveSymbols')) {
         vscode.window.showInformationMessage('AMLOG: reload the window to apply the new capture settings.');
       }
     }),

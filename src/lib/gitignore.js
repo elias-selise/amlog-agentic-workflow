@@ -5,8 +5,17 @@ const fs = require('fs-extra');
 const chalk = require('chalk');
 
 // Directories amlog and CodeGraph generate at the workspace root — these are
-// local/machine-specific artifacts and should never be committed.
-const MANAGED_ENTRIES = ['.amlog/', '.codegraph/', '.knowledge-graph/'];
+// local/machine-specific artifacts and should never be committed. The agent
+// trace files the VS Code extension writes next to each issue's instructions.md
+// and plan.md (docs/<issue>/agent-trace.json and the exported .html) are local
+// too: they are for the developer looking at how an agent worked, not for the PR.
+const MANAGED_ENTRIES = [
+  '.amlog/',
+  '.codegraph/',
+  '.knowledge-graph/',
+  'docs/*/agent-trace.json',
+  'docs/*/agent-trace.html',
+];
 
 /**
  * Ensure the given entries exist in the workspace's .gitignore, appending any

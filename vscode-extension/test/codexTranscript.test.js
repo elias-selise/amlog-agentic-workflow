@@ -170,3 +170,8 @@ test('unknown tools, malformed arguments and garbage are skipped without throwin
     assert.deepEqual(p.feed(r).events, []);
   }
 });
+
+test('a shell command that exits non-zero is reported as a failed tool call', () => {
+  const { metas } = run([meta(), call('c1', 'dotnet test', '/ws'), out('c1', 'Failed!', 1), call('c2', 'ls', '/ws'), out('c2', 'ok', 0)]);
+  assert.deepEqual(metas.filter((m) => m.kind === 'toolError'), [{ kind: 'toolError', tool: 'shell' }]);
+});

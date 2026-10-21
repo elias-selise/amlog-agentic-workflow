@@ -1,8 +1,8 @@
 {
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
-  "description": "Watch what your AI agents actually do (Claude Code, Codex, Antigravity): a line-drawn spider follows every read, edit and search (including grep/sed in Bash) live, and each issue gets a shareable agent-trace.json.",
-  "version": "0.4.0",
+  "description": "Watch what your AI agents actually do (Claude Code, Codex, Antigravity): a line-drawn spider follows every read, edit and search live, and each issue gets an agent-trace.json you can replay, with phases, what led to each step, and signals worth a second look.",
+  "version": "0.5.0",
   "publisher": "selise",
   "license": "MIT",
   "repository": {
@@ -50,6 +50,15 @@
         "title": "AMLOG: Export Trace as HTML"
       },
       {
+        "command": "amlog.showTraceForSelection",
+        "title": "AMLOG: Show Agent Trace for This Code",
+        "icon": "$(history)"
+      },
+      {
+        "command": "amlog.copyTraceSummary",
+        "title": "AMLOG: Copy Trace Summary for PR"
+      },
+      {
         "command": "amlog.toggleDecorations",
         "title": "AMLOG: Toggle Spider Decorations"
       },
@@ -89,6 +98,13 @@
           "command": "amlog.clearActivity",
           "when": "view == amlogActivity",
           "group": "navigation@4"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "amlog.showTraceForSelection",
+          "when": "editorTextFocus && resourceScheme == file",
+          "group": "9_amlog@1"
         }
       ]
     },
@@ -154,6 +170,11 @@
             "antigravity"
           ],
           "description": "Which agents' session logs to follow for this workspace (Claude Code, Codex CLI, Antigravity CLI). Only sessions that worked in this workspace (or another worktree of its repository) are read. Reload the window after changing."
+        },
+        "amlog.resolveSymbols": {
+          "type": "boolean",
+          "default": true,
+          "description": "Name the function/class an agent touched (e.g. \"edited parseInvoice()\") from the repo's CodeGraph index, for steps that happen while the extension is running. Needs Node 22+ in VS Code and a CodeGraph index; silently off otherwise. Reload the window after changing."
         }
       }
     }

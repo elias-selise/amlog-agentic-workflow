@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { StepMatch, stepsTouching } from './traceQuery';
 
 // "Trace Replay": renders a docs/<issue>/agent-trace.json in a webview (timeline
 // scrubber, the agent's words at each step, files touched so far) and exports it
@@ -25,14 +26,19 @@ const BODY = `
   <div id="controls2" style="padding:6px 16px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;border-bottom:1px solid var(--border)">
     <div class="chips" id="chips-ops"></div><div class="chips" id="chips-agents"></div>
   </div>
+  <div id="phases" class="hidden"></div>
   <div id="timeline-wrap"><canvas id="timeline"></canvas></div>
   <div id="main">
     <div id="left">
       <div><h3>Now</h3><div id="now"></div></div>
+      <div id="insights-box" class="hidden"><h3 id="insights-title">Worth a look</h3><div id="insights"></div></div>
       <div><h3 id="files-title">Files touched so far</h3><div id="files"></div></div>
       <div><h3>Agents</h3><div id="agents"></div></div>
     </div>
-    <div id="right"><div id="steps"></div></div>
+    <div id="right">
+      <div id="tabs"><button data-tab="steps" class="on">Steps</button><button data-tab="flow">Flow</button></div>
+      <div id="steps"></div>
+      <div id="flow" class="hidden"></div>
   </div>
 </div>`;
 
@@ -45,6 +51,7 @@ export function inlineReplayHtml(extensionUri: vscode.Uri, doc: unknown): string
 <title>Agent trace</title><style>${read('replay.css')}</style></head>
 <body>${BODY}
 <script>window.__TRACE__ = ${data};</script>
+<script>${read('traceAnalysis.js').replace(/<\/script/gi, '<\\/script')}</script>
 <script>${read('replay.js').replace(/<\/script/gi, '<\\/script')}</script>
 </body></html>`;
 }
@@ -72,12 +79,21 @@ function readTrace(file: vscode.Uri): unknown | undefined {
   }
 }
 
+// Which step of a trace to open the replay at.
+export interface SeekTarget {
+  session: string;
+  t: string;
+  agent: string;
+  op?: string; // several steps of one tool call share a timestamp: say which
+  file?: string;
+}
+
 export class ReplayPanel {
   private static current: ReplayPanel | undefined;
   private readonly disposables: vscode.Disposable[] = [];
   private disposed = false;
 
-  static async show(context: vscode.ExtensionContext, root: vscode.Uri, file?: vscode.Uri): Promise<void> {
+  static async show(context: vscode.ExtensionContext, root: vscode.Uri, file?: vscode.Uri, seek?: SeekTarget): Promise<void> {
     let target = file;
     if (!target) {
       const files = await findTraceFiles(root);
@@ -100,10 +116,81 @@ export class ReplayPanel {
         target = pick.uri;
       }
     }
-    if (ReplayPanel.current) {
-      ReplayPanel.current.dispose();
+    const open = ReplayPanel.current;
+    if (open && seek && open.file.fsPath === target.fsPath) {
+      open.panel.reveal(open.panel.viewColumn);
+      open.panel.webview.postMessage({ type: 'seek', ...seek });
+      return;
     }
-    ReplayPanel.current = new ReplayPanel(context, target);
+    open?.dispose();
+    ReplayPanel.current = new ReplayPanel(context, target, seek);
+  }
+
+  // "Show the agent trace for this code": the steps that touched the selected
+  // lines of the active editor, then the replay opened at the one you pick.
+  static async showForSelection(context: vscode.ExtensionContext, root: vscode.Uri): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showInformationMessage('AMLOG: open a file and select some code first.');
+      return;
+    }
+    const file = vscode.workspace.asRelativePath(editor.document.uri, false).split('\\').join('/');
+    const from = editor.selection.start.line + 1;
+    const to = editor.selection.end.line + 1;
+    const hits: { match: StepMatch; trace: vscode.Uri }[] = [];
+    for (const trace of await findTraceFiles(root)) {
+      const doc = readTrace(trace);
+      for (const match of doc ? stepsTouching(doc, file, from, to) : []) {
+        hits.push({ match, trace });
+      }
+    }
+    if (!hits.length) {
+      vscode.window.showInformationMessage(`AMLOG: no agent step in a recorded trace touched ${file}${from === to ? `:${from}` : `:${from}-${to}`}.`);
+      return;
+    }
+    const when = (t: string) => new Date(t).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const pick = await vscode.window.showQuickPick(
+      hits.map((h) => {
+        const m = h.match;
+        const range = m.lines ? ` lines ${m.lines[0]}${m.lines[1] !== m.lines[0] ? `–${m.lines[1]}` : ''}` : '';
+        return {
+          label: `$(${m.op === 'write' ? 'edit' : 'eye'}) ${m.op === 'write' ? 'edited' : 'read'}${range}${m.symbol ? ` · ${m.symbol}` : ''}`,
+          description: `${m.agentLabel} · ${when(m.t)}`,
+          detail: m.caption ? `“${m.caption}”` : m.detail,
+          hit: h,
+        };
+      }),
+      { placeHolder: `Agent steps that touched ${file}${from === to ? '' : ` (lines ${from}-${to})`}`, matchOnDescription: true, matchOnDetail: true },
+    );
+    if (pick) {
+      const { match, trace } = pick.hit;
+      await ReplayPanel.show(context, root, trace, { session: match.session, t: match.t, agent: match.agent, op: match.op, file });
+    }
+  }
+
+  // A short markdown summary of a session, copied for pasting into a PR.
+  static async copySummary(context: vscode.ExtensionContext, root: vscode.Uri): Promise<void> {
+    const files = await findTraceFiles(root);
+    const pick = files.length === 1 ? { uri: files[0] } : await vscode.window.showQuickPick(
+      files.map((u) => ({ label: vscode.workspace.asRelativePath(u), uri: u })),
+      { placeHolder: 'Pick the agent trace to summarise' },
+    );
+    if (!pick) {
+      if (!files.length) {
+        vscode.window.showInformationMessage('AMLOG: no agent traces to summarise yet.');
+      }
+      return;
+    }
+    const doc = readTrace(pick.uri);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const analysis = require(path.join(context.extensionUri.fsPath, 'media', 'traceAnalysis.js')) as { markdown(d: unknown): string };
+    const text = doc ? analysis.markdown(doc) : '';
+    if (!text) {
+      vscode.window.showErrorMessage('AMLOG: that trace has no session to summarise.');
+      return;
+    }
+    await vscode.env.clipboard.writeText(text);
+    vscode.window.showInformationMessage('AMLOG: agent trace summary copied. Paste it into the PR description.');
   }
 
   static async exportHtml(context: vscode.ExtensionContext, root: vscode.Uri, file?: vscode.Uri): Promise<void> {
@@ -137,7 +224,7 @@ export class ReplayPanel {
 
   private readonly panel: vscode.WebviewPanel;
 
-  private constructor(private readonly context: vscode.ExtensionContext, private readonly file: vscode.Uri) {
+  private constructor(private readonly context: vscode.ExtensionContext, private readonly file: vscode.Uri, private readonly seek?: SeekTarget) {
     this.panel = vscode.window.createWebviewPanel(
       'amlogTraceReplay',
       `Replay · ${path.basename(path.dirname(file.fsPath)) === 'traces' ? path.basename(file.fsPath) : `#${path.basename(path.dirname(file.fsPath))}`}`,
@@ -153,6 +240,9 @@ export class ReplayPanel {
     this.panel.webview.onDidReceiveMessage((msg) => {
       if (msg?.type === 'ready') {
         this.send(false);
+        if (this.seek) {
+          this.panel.webview.postMessage({ type: 'seek', ...this.seek });
+        }
       } else if (msg?.type === 'export') {
         void ReplayPanel.exportHtml(this.context, vscode.Uri.file(path.dirname(this.file.fsPath)), this.file);
       }
@@ -182,7 +272,7 @@ export class ReplayPanel {
 <html lang="en"><head><meta charset="UTF-8" /><meta http-equiv="Content-Security-Policy" content="${csp}" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" /><link href="${media('replay.css')}" rel="stylesheet" />
 <title>AMLOG Trace Replay</title></head>
-<body>${BODY}<script nonce="${nonce}" src="${media('replay.js')}"></script></body></html>`;
+<body>${BODY}<script nonce="${nonce}" src="${media('traceAnalysis.js')}"></script><script nonce="${nonce}" src="${media('replay.js')}"></script></body></html>`;
   }
 
   dispose(): void {
