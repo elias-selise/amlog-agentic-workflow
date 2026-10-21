@@ -204,8 +204,21 @@ package).
   any error is swallowed and it always exits 0, so it can never break an agent's
   tool call.
 - **Registration:** `src/lib/hooks.js` merges a `PostToolUse` entry (matcher
-  `Read|Write|Edit|MultiEdit|NotebookEdit`) into `.claude/settings.json`,
+  `Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob|Bash`) into `.claude/settings.json`,
   preserving any existing settings/hooks. Idempotent; `amlog uninstall` removes it.
+- **Transcript is the primary source (extension ≥ 0.2.0):** each hook event also
+  carries `transcript` (the hook's `transcript_path`). The extension tails the
+  Claude Code session transcript (`~/.claude/projects/<encoded path>/<session>.jsonl`
+  plus `<session>/subagents/agent-<id>.jsonl`) for full detail: reads/searches
+  done through Bash (`grep`, `sed -n`, `cat`, `find`…), exact line ranges from the
+  tool results, search hits, the agent's one-line captions, and tokens/model/time.
+  Hook events for a session whose transcript is tracked are ignored; the hook file
+  is only the fallback.
+- **Agent trace file:** the extension writes each session into
+  `docs/<issue-number>/agent-trace.json` (next to `instructions.md`/`plan.md`; the
+  issue folder is the `docs/<n>/` the session touched most) — paths, line ranges,
+  queries/hit counts, captions and metrics, never file contents or tool output.
+  Sessions with no issue folder go to `.amlog/traces/<session>.json`.
 - **Output:** one NDJSON line per file touch appended to
   `.amlog/activity/events.ndjson` (gitignored, size-rotated):
   ```json
@@ -222,9 +235,9 @@ package).
 - **Claude-only for now:** per-agent labelling relies on Claude Code's hook
   fields. Other adapters can emit the same NDJSON schema later without changing
   the consumer.
-- **Related wishlist:** execution metrics (tokens/model/time) are *not* available
-  in hook input — they live in the transcript — so they are a separate future
-  `metrics.ndjson`, not part of this capture.
+- **Execution metrics:** tokens/model/time are not in hook input; they come from
+  the transcript and are recorded per agent in `agent-trace.json` (`metrics`,
+  `agents[].tokens`).
 
 ---
 

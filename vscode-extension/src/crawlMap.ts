@@ -9,6 +9,7 @@ import { colorForAgent } from './palette';
 export class CrawlMapPanel {
   private static current: CrawlMapPanel | undefined;
   private readonly disposables: vscode.Disposable[] = [];
+  private disposed = false;
 
   static show(context: vscode.ExtensionContext, backlog: ActivityEvent[]): CrawlMapPanel {
     const column = vscode.window.activeTextEditor?.viewColumn ?? vscode.ViewColumn.One;
@@ -53,6 +54,9 @@ export class CrawlMapPanel {
   }
 
   post(event: ActivityEvent): void {
+    if (this.disposed) {
+      return; // the extension may still hold a closed panel
+    }
     this.panel.webview.postMessage({
       type: 'event',
       event: { ...event, color: colorForAgent(event.agent) },
@@ -60,7 +64,9 @@ export class CrawlMapPanel {
   }
 
   reset(): void {
-    this.panel.webview.postMessage({ type: 'reset' });
+    if (!this.disposed) {
+      this.panel.webview.postMessage({ type: 'reset' });
+    }
   }
 
   private html(extensionUri: vscode.Uri): string {
@@ -106,6 +112,10 @@ export class CrawlMapPanel {
   }
 
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
     CrawlMapPanel.current = undefined;
     this.panel.dispose();
     for (const d of this.disposables) {

@@ -1,8 +1,8 @@
 {
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
-  "description": "Live visualization of which files each AMLOG agent reads and writes — a line-drawn spider crawls your files in real time.",
-  "version": "0.1.5",
+  "description": "Watch what your AI agents actually do: a line-drawn spider follows every read, edit and search (including grep/sed in Bash) live, and each issue gets a shareable agent-trace.json.",
+  "version": "0.3.0",
   "publisher": "selise",
   "license": "MIT",
   "repository": {
@@ -41,6 +41,15 @@
         "icon": "$(bug)"
       },
       {
+        "command": "amlog.openTraceReplay",
+        "title": "AMLOG: Open Trace Replay",
+        "icon": "$(history)"
+      },
+      {
+        "command": "amlog.exportTraceHtml",
+        "title": "AMLOG: Export Trace as HTML"
+      },
+      {
         "command": "amlog.toggleDecorations",
         "title": "AMLOG: Toggle Spider Decorations"
       },
@@ -72,9 +81,14 @@
           "group": "navigation@2"
         },
         {
-          "command": "amlog.clearActivity",
+          "command": "amlog.openTraceReplay",
           "when": "view == amlogActivity",
           "group": "navigation@3"
+        },
+        {
+          "command": "amlog.clearActivity",
+          "when": "view == amlogActivity",
+          "group": "navigation@4"
         }
       ]
     },
@@ -100,6 +114,29 @@
           "type": "number",
           "default": 8,
           "description": "How many recently touched files each agent's silk trail connects in the crawl map."
+        },
+        "amlog.captureSource": {
+          "type": "string",
+          "enum": [
+            "transcript",
+            "hook"
+          ],
+          "default": "transcript",
+          "enumDescriptions": [
+            "Read the Claude Code session transcripts (full detail: Bash reads/searches, exact lines, captions, tokens). The hook file is used only for sessions without a transcript.",
+            "Only use the PostToolUse hook file (.amlog/activity/events.ndjson)."
+          ],
+          "description": "Where agent activity is captured from. Reload the window after changing."
+        },
+        "amlog.sessionLookbackMinutes": {
+          "type": "number",
+          "default": 60,
+          "description": "On startup, replay Claude Code sessions active within this many minutes (into the recap and trace)."
+        },
+        "amlog.writeTraceFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write each session into docs/<issue>/agent-trace.json (the folder holding the issue instructions.md / plan.md), or .amlog/traces/ when no issue folder is found."
         }
       }
     }

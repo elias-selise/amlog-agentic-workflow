@@ -1,39 +1,43 @@
 // @ts-check
-// AMLOG Code Crawl webview — multi-pane.
+// AMLOG Code Crawl webview — one lane per live agent.
 //
-// Each file an agent is working on gets its own pane with its own line-drawn
-// spider that walks the code LINE BY LINE, pausing on each line to "inspect" it
-// (a scan beam for reads, a woven stitch for writes). When several files are
-// active at once the view splits into a grid so you see every spider working in
-// parallel. Zoom with the toolbar buttons or Ctrl+wheel.
+// The extension paces each agent's steps (see src/livePlayer.ts) and sends them
+// here one at a time. A lane plays each step as a path of waypoints the spider
+// walks:
+//  - read / write: the spider crawls ALONG the lines of the exact range (a scan
+//    beam for reads, a woven stitch for writes), strided to fit the step's time;
+//  - search: the spider types the query into a search box, then walks down the
+//    hits it found;
+//  - a read that opens one of those hits: the spider picks the hit row, then
+//    lands on that line in the file and crawls the range from there.
 (function () {
   const vscode = acquireVsCodeApi();
-  const panesEl = /** @type {HTMLElement} */ (document.getElementById('panes'));
+  const lanesEl = /** @type {HTMLElement} */ (document.getElementById('lanes'));
   const statusEl = /** @type {HTMLElement} */ (document.getElementById('status'));
   const zoomLabel = /** @type {HTMLElement} */ (document.getElementById('zoom-level'));
   const focusEl = /** @type {HTMLSelectElement} */ (document.getElementById('focus'));
 
-  let focusAgent = ''; // '' = all agents
+  const GUTTER = 52;          // x where code text starts (line numbers sit left of it)
+  const MAX_LANES = 4;
+  const LANE_TTL_MS = 25000;  // an idle lane closes after this long
+  const MAX_HIT_ROWS = 30;
+  const CAPTION_STALE_MS = 12000;
+
+  let focusAgent = '';        // '' = all agents
   const agentsSeen = new Set();
-
-  const GUTTER = 52;
-  const SPEED = 0.42;     // px/ms — brisk, visible crawl
-  const MAX_WAYPOINTS = 400;
-
-  /** @type {Map<string, Pane>} */
-  const panes = new Map();
+  /** @type {Map<string, Lane>} */
+  const lanes = new Map();
   let lastTs = 0;
   let zoom = 13;
 
-  // Off-screen context used to measure how wide a line's text is, so the spider
-  // can walk across the actual characters rather than a fixed width.
   const measureCanvas = document.createElement('canvas');
-  const measureCtx = measureCanvas.getContext('2d');
+  const measureCtx = /** @type {CanvasRenderingContext2D} */ (measureCanvas.getContext('2d'));
 
   // ---- zoom ----------------------------------------------------------------
   function applyZoom() {
     document.documentElement.style.setProperty('--cc-font', `${zoom}px`);
     zoomLabel.textContent = `${Math.round((zoom / 13) * 100)}%`;
+    for (const lane of lanes.values()) { lane.layout(); }
   }
   function setZoom(px) {
     zoom = Math.max(8, Math.min(28, px));
@@ -48,61 +52,105 @@
       setZoom(zoom + (e.deltaY < 0 ? 1 : -1));
     }
   }, { passive: false });
-  applyZoom();
 
-  // ---- pane ----------------------------------------------------------------
+  // ---- helpers ---------------------------------------------------------------
   function escapeHtml(s) {
-    return s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
+    return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   }
+  function shortPath(p) {
+    const segs = String(p || '').split('/');
+    return segs.length > 4 ? `…/${segs.slice(-3).join('/')}` : p;
+  }
+  function textWidthOf(text, el) {
+    let fam = 'monospace';
+    let size = `${zoom}px`;
+    try {
+      const cs = getComputedStyle(el);
+      fam = cs.fontFamily || fam;
+      size = cs.fontSize || size;
+    } catch (e) { /* no DOM */ }
+    measureCtx.font = `${size} ${fam}`;
+    return measureCtx.measureText(String(text).replace(/\t/g, '    ')).width;
+  }
+  const OP_ICON = { read: '👁', write: '✎', search: '⌕' };
 
-  class Pane {
-    constructor(file) {
-      this.file = file;
-      this.op = 'read';
-      this.color = '#9e9e9e';
-      this.detail = '';
-      this.agent = '';
+  // ---- lane ------------------------------------------------------------------
+  class Lane {
+    constructor(key, agent, agentId, color) {
+      this.key = key;
+      this.agent = agent;
+      this.color = color;
+      this.mode = 'code';       // 'code' | 'search'
+      this.file = '';
       this.lineEls = [];
-      this.queue = [];        // line indexes still to walk
-      this.web = [];
-      this.curLine = -1;
-      this.mode = 'idle';     // 'idle' | 'approach' | 'crawl'
-      this.bodyX = GUTTER;    // screen x of the spider (walks across the code)
-      this.bodyDocY = -100;   // document y of the spider
-      this.lineStartX = GUTTER;
-      this.lineEndX = GUTTER;
-      this.lineY = -100;
+      this.rangeEls = [];
+      this.hitEls = [];
+      this.queue = [];          // steps waiting to play
+      this.step = null;         // step being played
+      this.path = [];           // waypoints still to walk
+      this.wp = null;           // current waypoint
+      this.phase = 'approach';  // 'approach' | 'crawl'
       this.dwell = 0;
-      this.heading = 0;       // facing direction (radians) for the head
-      this.prevX = GUTTER;
-      this.prevDocY = -100;
+      this.rush = false;
+      this.lastActive = performance.now();
+      this.web = [];
+      this.x = GUTTER;
+      this.y = 20;
+      this.prevX = this.x;
+      this.prevY = this.y;
+      this.heading = 0;
       this.feet = [];
       for (let i = 0; i < 8; i++) {
-        this.feet.push({ x: 0, y: 0, side: i < 4 ? -1 : 1, rank: i % 4, step: Math.random() * 6.28 });
+        this.feet.push({ x: this.x, y: this.y, side: i < 4 ? -1 : 1, rank: i % 4, step: Math.random() * 6.28 });
       }
+      this.captionTimer = 0;
 
       this.root = document.createElement('div');
-      this.root.className = 'pane';
+      this.root.className = 'lane';
       this.root.innerHTML =
-        '<div class="pane-header"><span class="dot"></span><span class="agent"></span>'
-        + '<span class="op"></span><span class="file"></span></div>'
-        + '<div class="pane-viewport"><pre class="code"></pre></div>'
-        + '<canvas class="overlay"></canvas>';
-      panesEl.appendChild(this.root);
-      this.dotEl = this.root.querySelector('.dot');
-      this.agentEl = this.root.querySelector('.agent');
-      this.opEl = this.root.querySelector('.op');
-      this.fileEl = this.root.querySelector('.file');
-      this.viewport = this.root.querySelector('.pane-viewport');
-      this.codeEl = this.root.querySelector('.code');
-      this.canvas = this.root.querySelector('.overlay');
-      this.ctx = this.canvas.getContext('2d');
+        '<div class="lane-header"><span class="dot"></span><span class="agent"></span>'
+        + '<span class="op"></span><span class="file" title=""></span></div>'
+        + '<div class="caption"><span class="caption-text"></span></div>'
+        + '<div class="lane-body">'
+        + '<div class="viewport code-vp"><pre class="code"></pre></div>'
+        + '<div class="viewport search-vp hidden">'
+        + '<div class="search-box"><span class="search-icon">⌕</span><span class="search-tool"></span>'
+        + '<span class="search-text"></span><span class="search-caret"></span></div>'
+        + '<div class="search-meta"></div><div class="hits"></div></div>'
+        + '<canvas class="overlay"></canvas></div>';
+      lanesEl.appendChild(this.root);
+      const q = (sel) => /** @type {HTMLElement} */ (this.root.querySelector(sel));
+      this.dotEl = q('.dot');
+      this.agentEl = q('.agent');
+      this.opEl = q('.op');
+      this.fileEl = q('.file');
+      this.captionEl = q('.caption');
+      this.captionText = q('.caption-text');
+      this.body = q('.lane-body');
+      this.codeVp = q('.code-vp');
+      this.codeEl = q('.code');
+      this.searchVp = q('.search-vp');
+      this.searchBox = q('.search-box');
+      this.searchTool = q('.search-tool');
+      this.searchText = q('.search-text');
+      this.searchMeta = q('.search-meta');
+      this.hitsEl = q('.hits');
+      this.canvas = /** @type {HTMLCanvasElement} */ (q('.overlay'));
+      this.ctx = /** @type {CanvasRenderingContext2D} */ (this.canvas.getContext('2d'));
+
+      this.agentEl.textContent = agentId ? `${agent} · ${agentId.slice(0, 6)}` : agent;
+      this.dotEl.style.background = color;
+      this.fileEl.addEventListener('click', () => {
+        if (this.file) { vscode.postMessage({ type: 'open', file: this.file }); }
+      });
     }
+
+    vp() { return this.mode === 'code' ? this.codeVp : this.searchVp; }
 
     layout() {
       const ratio = window.devicePixelRatio || 1;
-      const w = this.viewport.clientWidth;
-      const h = this.viewport.clientHeight;
+      const w = this.body.clientWidth;
+      const h = this.body.clientHeight;
       this.canvas.style.width = `${w}px`;
       this.canvas.style.height = `${h}px`;
       this.canvas.width = Math.max(1, w * ratio);
@@ -110,165 +158,312 @@
       this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     }
 
-    render(lines) {
+    // Switch views, keeping the spider where it is on screen.
+    setMode(mode) {
+      if (this.mode === mode) { return; }
+      const screenY = this.y - this.vp().scrollTop;
+      const prevScreenY = this.prevY - this.vp().scrollTop;
+      this.mode = mode;
+      this.codeVp.classList.toggle('hidden', mode !== 'code');
+      this.searchVp.classList.toggle('hidden', mode !== 'search');
+      this.y = screenY + this.vp().scrollTop;
+      this.prevY = prevScreenY + this.vp().scrollTop;
+      this.web = [];
+    }
+
+    ensureVisible(y) {
+      const vp = this.vp();
+      const top = vp.scrollTop;
+      const h = vp.clientHeight;
+      if (y < top + 30) {
+        vp.scrollTo({ top: Math.max(0, y - 60) });
+      } else if (y > top + h - 50) {
+        vp.scrollTo({ top: y - h + 120 });
+      }
+    }
+
+    // ---- queue ----
+    enqueue(step) {
+      this.queue.push(step);
+      this.lastActive = performance.now();
+      this.rush = this.queue.length > 1;
+    }
+
+    busy() { return !!(this.step || this.wp || this.queue.length || this.path.length); }
+
+    // Next waypoint; when the step's path is done, start the next queued step.
+    advance() {
+      for (let guard = 0; guard < 50; guard++) {
+        if (this.path.length) {
+          this.wp = this.path.shift();
+          this.phase = 'approach';
+          if (this.wp.onBegin) { this.wp.onBegin(); }
+          return true;
+        }
+        this.step = null;
+        if (!this.queue.length) { return false; }
+        this.begin(this.queue.shift());
+      }
+      return false;
+    }
+
+    begin(step) {
+      this.step = step;
+      this.lastActive = performance.now();
+      this.rush = this.queue.length > 1;
+      this.setHeader(step);
+      if (step.caption) { this.setCaption(step.caption); }
+      if (step.op === 'search') {
+        this.planSearch(step);
+      } else if (typeof step.fromHit === 'number' && this.mode === 'search' && this.hitEls[step.fromHit]) {
+        this.planPick(step);
+      } else {
+        this.planCode(step, 0.85);
+      }
+    }
+
+    setHeader(step) {
+      this.opEl.textContent = `${OP_ICON[step.op] || '•'} ${step.detail || step.op}`;
+      this.opEl.style.color = this.color;
+      this.fileEl.textContent = shortPath(step.file);
+      this.fileEl.title = step.file;
+      this.root.dataset.op = step.op;
+    }
+
+    setCaption(text) {
+      this.captionText.textContent = text;
+      this.captionEl.classList.add('show');
+      this.captionEl.classList.remove('stale');
+      clearTimeout(this.captionTimer);
+      this.captionTimer = setTimeout(() => this.captionEl.classList.add('stale'), CAPTION_STALE_MS);
+    }
+
+    // Spread `budgetMs` over the waypoints: one speed so the walk ends on time.
+    pace(wps, budgetMs) {
+      let len = 0;
+      let lastY = this.y;
+      for (const w of wps) {
+        len += Math.abs(w.x1 - w.x0) + Math.abs(w.y - lastY) * 0.5 + 10;
+        lastY = w.y;
+      }
+      const speed = Math.max(0.12, Math.min(6, len / Math.max(150, budgetMs)));
+      for (const w of wps) { w.speed = speed; }
+      return wps;
+    }
+
+    // ---- code ----
+    renderCode(lines) {
       this.codeEl.innerHTML = lines
         .map((l) => `<span class="line">${escapeHtml(l) || ' '}</span>`)
         .join('');
       this.lineEls = Array.from(this.codeEl.querySelectorAll('.line'));
-      this.bodyDocY = this.prevDocY = this.lineCenterDocY(0);
-      this.bodyX = this.prevX = GUTTER;
-      this.queue = [];
+      this.rangeEls = [];
       this.web = [];
-      this.curLine = -1;
-      this.mode = 'idle';
-      this.layout();
     }
 
-    codeFont() {
-      let fam = 'monospace';
-      try { fam = getComputedStyle(this.codeEl).fontFamily || 'monospace'; } catch (e) { /* no DOM */ }
-      return `${zoom}px ${fam}`;
-    }
-
-    // Pixel width of the code on line i (tabs expanded), clamped so the spider
-    // stays within the pane even on very long lines.
-    textWidth(i) {
-      const el = this.lineEls[i];
-      if (!el) { return 12; }
-      const txt = (el.textContent || '').replace(/\t/g, '    ');
-      measureCtx.font = this.codeFont();
-      const w = measureCtx.measureText(txt).width;
-      const maxW = Math.max(60, this.canvas.clientWidth - GUTTER - 16);
-      return Math.max(10, Math.min(w, maxW));
-    }
-
-    setHeader() {
-      this.agentEl.textContent = this.agent;
-      const verb = this.op === 'write' ? '✎' : '👁';
-      this.opEl.textContent = this.detail ? `${verb} ${this.detail}` : (this.op === 'write' ? '✎ writing' : '👁 reading');
-      this.opEl.style.color = this.color;
-      this.fileEl.textContent = this.file;
-      this.dotEl.style.background = this.color;
-    }
-
-    lineCenterDocY(i) {
+    lineCenter(i) {
       const el = this.lineEls[i];
       return el ? el.offsetTop + el.offsetHeight / 2 : 0;
     }
-    lineBox(i) {
+
+    lineWidth(i) {
       const el = this.lineEls[i];
-      return el ? { top: el.offsetTop, h: el.offsetHeight } : null;
+      const maxW = Math.max(60, this.body.clientWidth - GUTTER - 16);
+      if (!el) { return 12; }
+      return Math.max(10, Math.min(textWidthOf(el.textContent || '', this.codeEl), maxW));
     }
 
-    // Walk line by line. A range walks exactly those lines; a whole-file read
-    // walks the whole file top-to-bottom. Big files are strided so it stays
-    // snappy while still sweeping the entire file.
-    plan(startLine, endLine) {
-      const n = this.lineEls.length;
-      if (n === 0) {
-        return;
+    planCode(step, budgetFrac) {
+      this.setMode('code');
+      const newFile = Array.isArray(step.lines);
+      if (newFile) {
+        this.renderCode(step.lines);
+      } else if (step.unreadable) {
+        this.renderCode([`(${step.file} is not readable here — binary, too large, or outside this machine)`]);
+      } else if (this.file !== step.file && this.lineEls.length === 0) {
+        this.renderCode(['(loading…)']);
       }
+      this.file = step.file;
+      const n = this.lineEls.length;
+      if (!n) { return; }
+
+      for (const el of this.rangeEls) { el.classList.remove('in-range', 'r-read', 'r-write'); }
       const clamp = (i) => Math.max(0, Math.min(n - 1, i));
-      const hasRange = Number.isFinite(startLine);
-      const from = hasRange ? clamp(startLine - 1) : 0;
-      const to = hasRange ? clamp((Number.isFinite(endLine) ? endLine : startLine) - 1) : n - 1;
+      const hasRange = Number.isFinite(step.startLine);
+      const from = hasRange ? clamp(step.startLine - 1) : 0;
+      const to = Number.isFinite(step.endLine) ? clamp(step.endLine - 1) : (hasRange && step.op === 'write' ? from : n - 1);
       const lo = Math.min(from, to);
       const hi = Math.max(from, to);
+      this.rangeEls = this.lineEls.slice(lo, hi + 1);
+      for (const el of this.rangeEls) { el.classList.add('in-range', step.op === 'write' ? 'r-write' : 'r-read'); }
+
+      const budget = step.durationMs * budgetFrac;
+      const wps = [];
+      if (Number.isFinite(step.hitLine)) {
+        const h = clamp(step.hitLine - 1);
+        wps.push({
+          kind: 'land', x0: GUTTER, x1: GUTTER + Math.min(80, this.lineWidth(h)), y: this.lineCenter(h), dwell: 220,
+          onBegin: () => this.flash(h),
+        });
+      }
       const span = hi - lo + 1;
-      const stride = Math.max(1, Math.ceil(span / MAX_WAYPOINTS));
-      const plan = [];
-      for (let i = lo; i <= hi; i += stride) {
-        plan.push(i);
+      const maxWp = Math.max(3, Math.min(80, Math.round(budget / 55)));
+      const stride = Math.max(1, Math.ceil(span / maxWp));
+      for (let i = lo; i <= hi; i += stride) { wps.push(this.lineWaypoint(i, step.op)); }
+      if ((hi - lo) % stride !== 0) { wps.push(this.lineWaypoint(hi, step.op)); }
+      this.ensureVisible(wps[0].y);
+      if (newFile) {
+        // The spider drops in on a thread from the top of the view.
+        this.x = this.prevX = GUTTER;
+        this.y = this.prevY = this.codeVp.scrollTop - 20;
       }
-      if (plan[plan.length - 1] !== hi) {
-        plan.push(hi);
-      }
-      this.queue = this.queue.concat(plan);
+      this.path.push(...this.pace(wps, budget));
     }
 
-    // Start walking a line: highlight it and work out how far right the spider
-    // must crawl (the width of the actual code on that line).
-    beginLine(i) {
+    lineWaypoint(i, op) {
+      return {
+        kind: 'line', op, line: i, x0: GUTTER, x1: GUTTER + this.lineWidth(i), y: this.lineCenter(i),
+        dwell: op === 'write' ? 60 : 25,
+        onBegin: () => {
+          const el = this.lineEls[i];
+          if (el) { el.classList.remove('visited'); el.classList.add(op === 'write' ? 'active-write' : 'active-read'); }
+        },
+        onEnd: () => {
+          const el = this.lineEls[i];
+          if (el) {
+            setTimeout(() => { el.classList.remove('active-read', 'active-write'); el.classList.add('visited'); }, 700);
+          }
+          this.web.push({ x: this.x, y: this.y, op, age: 0 });
+          while (this.web.length > 70) { this.web.shift(); }
+        },
+      };
+    }
+
+    flash(i) {
       const el = this.lineEls[i];
-      if (el) {
-        el.classList.remove('visited');
-        el.classList.add(this.op);
-        setTimeout(() => { el.classList.remove('read', 'write'); el.classList.add('visited'); }, 1000);
-      }
-      this.lineStartX = GUTTER;
-      this.lineEndX = GUTTER + this.textWidth(i);
+      if (!el) { return; }
+      el.classList.add('landing');
+      setTimeout(() => el.classList.remove('landing'), 1600);
     }
 
-    // Lay a silk anchor at the end of a line the spider just finished.
-    dropAnchor() {
-      const box = this.lineBox(this.curLine);
-      if (!box) { return; }
-      this.web.push({ x: this.lineEndX, y: box.top + box.h / 2, op: this.op, age: 0 });
-      while (this.web.length > 70) { this.web.shift(); }
+    // ---- search ----
+    planSearch(step) {
+      this.setMode('search');
+      this.searchVp.scrollTop = 0;
+      this.searchTool.textContent = step.tool || 'search';
+      this.searchText.textContent = '';
+      this.searchMeta.textContent = `in ${shortPath(step.file)}`;
+      this.hitsEl.innerHTML = '';
+      this.hitEls = [];
+      const query = step.query || '';
+      const x0 = this.searchText.offsetLeft;
+      const maxW = Math.max(40, this.body.clientWidth - x0 - 24);
+      const w = Math.max(30, Math.min(maxW, textWidthOf(query, this.searchText)));
+      const y = this.searchBox.offsetTop + this.searchBox.offsetHeight / 2;
+      const typing = {
+        kind: 'type', x0, x1: x0 + w, y, dwell: 160,
+        onBegin: () => this.searchBox.classList.add('typing'),
+        onProgress: (f) => { this.searchText.textContent = query.slice(0, Math.ceil(f * query.length)); },
+        onEnd: () => {
+          this.searchText.textContent = query;
+          this.searchBox.classList.remove('typing');
+          this.showHits(step, step.durationMs * 0.5);
+        },
+      };
+      this.path.push(...this.pace([typing], step.durationMs * 0.35));
     }
 
-    ensureVisible(docY) {
-      const top = this.viewport.scrollTop;
-      const h = this.viewport.clientHeight;
-      if (docY < top + 40) {
-        this.viewport.scrollTo({ top: Math.max(0, docY - 50) });
-      } else if (docY > top + h - 70) {
-        this.viewport.scrollTo({ top: docY - h + 100 });
-      }
+    showHits(step, budget) {
+      const hits = step.hits || [];
+      const total = step.hitCount || 0;
+      const files = new Set(hits.map((h) => h.file)).size;
+      this.searchMeta.textContent = total
+        ? `${total} hit(s) in ${files}${total > hits.length ? '+' : ''} file(s) · in ${shortPath(step.file)}`
+        : `no hits · in ${shortPath(step.file)}`;
+      this.searchMeta.classList.toggle('none', !total);
+      const rows = hits.slice(0, MAX_HIT_ROWS);
+      this.hitsEl.innerHTML = rows.map((h, i) =>
+        `<div class="hit" data-i="${i}"><span class="hit-file">${escapeHtml(shortPath(h.file))}</span>`
+        + `${h.line ? `<span class="hit-line">:${h.line}</span>` : ''}`
+        + `${h.text ? `<span class="hit-text">${escapeHtml(h.text.trim())}</span>` : ''}</div>`).join('')
+        + (total > rows.length ? `<div class="more">+${total - rows.length} more</div>` : '');
+      this.hitEls = Array.from(this.hitsEl.querySelectorAll('.hit'));
+      this.hitEls.forEach((el, i) => {
+        el.addEventListener('click', () => vscode.postMessage({ type: 'open', file: rows[i].file, line: rows[i].line }));
+      });
+      if (!this.hitEls.length) { return; }
+      const count = Math.min(this.hitEls.length, Math.max(2, Math.min(30, Math.round(budget / 90))));
+      const stride = Math.max(1, Math.ceil(this.hitEls.length / count));
+      const wps = [];
+      for (let i = 0; i < this.hitEls.length; i += stride) { wps.push(this.rowWaypoint(i)); }
+      this.path.push(...this.pace(wps, budget));
     }
 
-    step(dt) {
+    rowWaypoint(i) {
+      const el = this.hitEls[i];
+      const w = Math.min(el.scrollWidth, this.body.clientWidth - 24);
+      return {
+        kind: 'row', x0: 10, x1: 10 + Math.max(40, w), y: el.offsetTop + el.offsetHeight / 2, dwell: 30,
+        onBegin: () => el.classList.add('scan'),
+        onEnd: () => { el.classList.remove('scan'); el.classList.add('seen'); },
+      };
+    }
+
+    // A read that opens one of the hits: pick the row, then land in the file.
+    planPick(step) {
+      const el = this.hitEls[step.fromHit];
+      const wp = {
+        kind: 'row', x0: 10, x1: 10 + Math.min(Math.max(40, el.scrollWidth), this.body.clientWidth - 24),
+        y: el.offsetTop + el.offsetHeight / 2, dwell: 260,
+        onBegin: () => { el.classList.add('picked'); this.ensureVisible(el.offsetTop); },
+        onEnd: () => this.planCode(step, 0.65),
+      };
+      this.path.push(...this.pace([wp], step.durationMs * 0.25));
+    }
+
+    // ---- animation ----
+    tick(dt) {
       if (this.dwell > 0) {
-        this.dwell -= dt;
+        this.dwell -= dt * (this.rush ? 4 : 1);
         return;
       }
-      if (this.mode === 'idle') {
-        if (this.queue.length === 0) { return; }
-        this.curLine = this.queue.shift();
-        this.beginLine(this.curLine);
-        this.mode = 'approach';
-      }
-
-      const box = this.lineBox(this.curLine);
-      if (!box) { this.mode = 'idle'; return; }
-      this.lineY = box.top + box.h / 2;
-
-      if (this.mode === 'approach') {
-        // travel to the start of the line (its left edge, on the first character)
-        const dx = this.lineStartX - this.bodyX;
-        const dy = this.lineY - this.bodyDocY;
+      if (!this.wp && !this.advance()) { return; }
+      const wp = this.wp;
+      const mult = this.rush ? 4 : 1;
+      if (this.phase === 'approach') {
+        const dx = wp.x0 - this.x;
+        const dy = wp.y - this.y;
         const dist = Math.hypot(dx, dy);
-        const sp = 0.7 * dt;
+        // Ease out over ~250ms however far the target is, so a jump across a
+        // long file never eats the step's time.
+        const sp = Math.max(0.35, wp.speed * 1.6, dist / 250) * dt * mult;
         if (dist <= sp || dist < 1.5) {
-          this.bodyX = this.lineStartX;
-          this.bodyDocY = this.lineY;
-          this.mode = 'crawl';
-          this.ensureVisible(this.lineY);
+          this.x = wp.x0;
+          this.y = wp.y;
+          this.phase = 'crawl';
+          this.ensureVisible(wp.y);
         } else {
-          this.bodyX += (dx / dist) * sp;
-          this.bodyDocY += (dy / dist) * sp;
+          this.x += (dx / dist) * sp;
+          this.y += (dy / dist) * sp;
         }
-      } else if (this.mode === 'crawl') {
-        // walk rightward ALONG the code of this line
-        this.bodyDocY = this.lineY;
-        const sp = (this.op === 'write' ? 0.3 : 0.55) * dt; // writing is slower (typing)
-        if (this.bodyX + sp >= this.lineEndX) {
-          this.bodyX = this.lineEndX;
-          this.dropAnchor();
-          this.mode = 'idle';
-          this.dwell = this.op === 'write' ? 90 : 45; // brief beat at end of line
-        } else {
-          this.bodyX += sp;
-        }
+        return;
+      }
+      this.y = wp.y;
+      this.x = Math.min(wp.x1, this.x + wp.speed * dt * mult);
+      const span = Math.max(1, wp.x1 - wp.x0);
+      if (wp.onProgress) { wp.onProgress(Math.min(1, (this.x - wp.x0) / span)); }
+      if (this.x >= wp.x1) {
+        this.wp = null;
+        this.dwell = this.rush ? 0 : (wp.dwell || 0);
+        if (wp.onEnd) { wp.onEnd(); }
       }
     }
 
     draw(dt) {
       const ctx = this.ctx;
-      const scroll = this.viewport.scrollTop;
-      const w = this.canvas.clientWidth;
-      ctx.clearRect(0, 0, w, this.canvas.clientHeight);
-      this.drawWeb(ctx, scroll, dt);
+      const scroll = this.vp().scrollTop;
+      ctx.clearRect(0, 0, this.canvas.clientWidth, this.canvas.clientHeight);
+      if (this.mode === 'code') { this.drawWeb(ctx, scroll, dt); }
       this.drawActive(ctx, scroll);
       this.drawSpider(ctx, scroll, dt);
     }
@@ -294,46 +489,44 @@
       ctx.globalAlpha = 1;
     }
 
-    // The read/write effect is tied to the spider's own position: it marks the
-    // code from the line's start up to where the spider has walked.
+    // The read/write effect follows the spider: it marks the line from its
+    // start up to where the spider has walked.
     drawActive(ctx, scroll) {
-      if (this.mode !== 'crawl' || this.curLine < 0) { return; }
-      const box = this.lineBox(this.curLine);
-      if (!box) { return; }
-      const y = box.top - scroll;
-      const x = this.bodyX;
-      if (this.op === 'write') {
+      const wp = this.wp;
+      if (!wp || this.phase !== 'crawl' || wp.kind !== 'line') { return; }
+      const el = this.lineEls[wp.line];
+      if (!el) { return; }
+      const y = el.offsetTop - scroll;
+      const h = el.offsetHeight;
+      const x = this.x;
+      if (wp.op === 'write') {
         ctx.fillStyle = this.color;
         ctx.globalAlpha = 0.16;
-        ctx.fillRect(this.lineStartX, y, Math.max(0, x - this.lineStartX), box.h);
+        ctx.fillRect(wp.x0, y, Math.max(0, x - wp.x0), h);
         const blink = 0.5 + 0.5 * Math.sin(performance.now() * 0.012);
         ctx.globalAlpha = 0.4 + 0.5 * blink;
-        ctx.fillRect(x - 1, y + 2, 2, box.h - 4); // caret at the spider
+        ctx.fillRect(x - 1, y + 2, 2, h - 4); // caret at the spider
       } else {
         const grad = ctx.createLinearGradient(x - 22, 0, x + 6, 0);
         grad.addColorStop(0, 'rgba(120,170,230,0)');
         grad.addColorStop(1, 'rgba(120,170,230,0.5)');
         ctx.fillStyle = grad;
         ctx.globalAlpha = 1;
-        ctx.fillRect(x - 22, y, 28, box.h);
+        ctx.fillRect(x - 22, y, 28, h);
       }
       ctx.globalAlpha = 1;
     }
 
     drawSpider(ctx, scroll, dt) {
-      if (this.lineEls.length === 0) { return; }
-      const bx = this.bodyX;
-      const by = this.bodyDocY - scroll;
-
-      // heading from actual movement, so the spider faces where it walks
-      const vx = this.bodyX - this.prevX;
-      const vy = this.bodyDocY - this.prevDocY;
+      const bx = this.x;
+      const by = this.y - scroll;
+      const vx = this.x - this.prevX;
+      const vy = this.y - this.prevY;
       const moving = Math.hypot(vx, vy) > 0.3;
       if (moving) { this.heading = Math.atan2(vy, vx); }
-      this.prevX = this.bodyX;
-      this.prevDocY = this.bodyDocY;
+      this.prevX = this.x;
+      this.prevY = this.y;
 
-      // legs: eight radial legs that step while moving
       ctx.strokeStyle = this.color;
       ctx.lineWidth = 1.4;
       ctx.lineCap = 'round';
@@ -355,7 +548,6 @@
         ctx.stroke();
       }
 
-      // body + head (head leads in the walking direction)
       const hx = bx + Math.cos(this.heading) * 6;
       const hy = by + Math.sin(this.heading) * 6;
       ctx.save();
@@ -370,7 +562,6 @@
       ctx.arc(hx, hy, 2.7, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      // eyes on the head
       ctx.globalAlpha = 1;
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       const ox = Math.cos(this.heading + Math.PI / 2) * 1.1;
@@ -382,78 +573,74 @@
     }
 
     dispose() {
+      clearTimeout(this.captionTimer);
       this.root.remove();
+      vscode.postMessage({ type: 'laneClosed', lane: this.key });
     }
   }
 
-  // ---- reconciliation ------------------------------------------------------
+  // ---- lanes -------------------------------------------------------------------
   function updateLayout() {
-    const n = panes.size;
-    panesEl.setAttribute('data-count', String(Math.min(n, 4)));
+    let visible = 0;
+    for (const lane of lanes.values()) {
+      const show = !focusAgent || lane.agent === focusAgent;
+      lane.root.style.display = show ? '' : 'none';
+      if (show) { visible++; }
+    }
+    lanesEl.setAttribute('data-count', String(Math.min(visible, 4)));
     let empty = document.getElementById('empty');
-    if (n === 0) {
+    if (visible === 0) {
       if (!empty) {
         empty = document.createElement('div');
         empty.id = 'empty';
-        empty.textContent = 'Waiting for a file read/write… (searching, shell & thinking show in the Crawl Map)';
-        panesEl.appendChild(empty);
+        empty.innerHTML = '<div class="empty-title">Waiting for agent activity</div>'
+          + '<div class="empty-sub">Live reads, edits and searches appear here as agents work. The full history is in the Crawl Map recap.</div>';
+        lanesEl.appendChild(empty);
       }
     } else if (empty) {
       empty.remove();
     }
-    // Canvases may have resized when the grid changed.
-    for (const p of panes.values()) {
-      p.layout();
-    }
+    for (const lane of lanes.values()) { lane.layout(); }
   }
 
-  function handlePanes(list) {
-    const incoming = new Set(list.map((p) => p.file));
-    // remove panes no longer active
-    for (const [file, pane] of panes) {
-      if (!incoming.has(file)) {
-        pane.dispose();
-        panes.delete(file);
-      }
-    }
-    // add / update
-    for (const info of list) {
-      let pane = panes.get(info.file);
-      const isNew = !pane;
-      if (!pane) {
-        pane = new Pane(info.file);
-        panes.set(info.file, pane);
-      }
-      pane.op = info.op;
-      pane.color = info.color;
-      pane.detail = info.detail || (info.unreadable ? 'binary / not shown' : '');
-      pane.agent = info.agent;
-      pane.setHeader();
-      if (Array.isArray(info.lines)) {
-        pane.render(info.lines);
-      }
-      if (info.agent) { agentsSeen.add(info.agent); }
-      if (isNew) {
-        updateLayout(); // grid dimensions change -> relayout before planning
-      }
-      pane.plan(info.startLine, info.endLine);
-    }
-    populateFocus();
-    applyFocus();
+  function closeLane(lane) {
+    lane.dispose();
+    lanes.delete(lane.key);
     updateLayout();
-
-    const files = panes.size;
-    const agents = new Set([...panes.values()].map((p) => p.agent)).size;
-    statusEl.textContent = files
-      ? `${agents} agent(s) · ${files} file(s) active`
-      : 'waiting for agent activity…';
   }
 
-  // Hide panes whose agent isn't the focused one ('' = show all).
-  function applyFocus() {
-    for (const pane of panes.values()) {
-      pane.root.style.display = (!focusAgent || pane.agent === focusAgent) ? '' : 'none';
+  function makeRoom() {
+    if (lanes.size < MAX_LANES) { return; }
+    const all = [...lanes.values()];
+    const idle = all.filter((l) => !l.busy());
+    const pool = idle.length ? idle : all;
+    pool.sort((a, b) => a.lastActive - b.lastActive);
+    closeLane(pool[0]);
+  }
+
+  function handleStep(step) {
+    if (step.agent && !agentsSeen.has(step.agent)) {
+      agentsSeen.add(step.agent);
+      populateFocus();
     }
+    let lane = lanes.get(step.lane);
+    if (!lane) {
+      makeRoom();
+      lane = new Lane(step.lane, step.agent, step.agentId, step.color);
+      lanes.set(step.lane, lane);
+      updateLayout();
+    }
+    lane.enqueue(step);
+    updateStatus();
+  }
+
+  function updateStatus() {
+    const live = [...lanes.values()].filter((l) => l.busy()).length;
+    const queued = [...lanes.values()].reduce((n, l) => n + l.queue.length, 0);
+    statusEl.textContent = lanes.size
+      ? `${live} agent(s) live · ${lanes.size} lane(s)${queued ? ` · ${queued} step(s) queued` : ''}`
+      : 'waiting for agent activity…';
+    document.body.classList.toggle('is-live', live > 0);
   }
 
   function populateFocus() {
@@ -472,26 +659,39 @@
     focusAgent = focusEl.value;
   }
 
-  // ---- loop ----------------------------------------------------------------
+  // ---- loop ----------------------------------------------------------------------
+  let sweepAt = 0;
   function frame(ts) {
     const dt = lastTs ? Math.min(60, ts - lastTs) : 16;
     lastTs = ts;
-    for (const pane of panes.values()) {
-      pane.step(dt);
-      pane.draw(dt);
+    for (const lane of lanes.values()) {
+      lane.tick(dt);
+      if (lane.root.style.display !== 'none') { lane.draw(dt); }
+    }
+    if (ts > sweepAt) {
+      sweepAt = ts + 1000;
+      for (const lane of [...lanes.values()]) {
+        if (!lane.busy() && ts - lane.lastActive > LANE_TTL_MS) { closeLane(lane); }
+      }
+      updateStatus();
     }
     requestAnimationFrame(frame);
   }
 
-  focusEl.addEventListener('change', () => { focusAgent = focusEl.value; applyFocus(); });
-  window.addEventListener('resize', () => { for (const p of panes.values()) { p.layout(); } });
+  focusEl.addEventListener('change', () => { focusAgent = focusEl.value; updateLayout(); });
+  window.addEventListener('resize', () => { for (const lane of lanes.values()) { lane.layout(); } });
   window.addEventListener('message', (e) => {
     const msg = e.data;
-    if (msg && msg.type === 'panes') {
-      handlePanes(msg.panes || []);
+    if (!msg) { return; }
+    if (msg.type === 'step' && msg.step) {
+      handleStep(msg.step);
+    } else if (msg.type === 'reset') {
+      for (const lane of [...lanes.values()]) { closeLane(lane); }
+      updateStatus();
     }
   });
 
+  applyZoom();
   updateLayout();
   requestAnimationFrame(frame);
   vscode.postMessage({ type: 'ready' });

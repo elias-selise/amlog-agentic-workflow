@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { ActivityState } from './activityState';
 
 type Node = AgentNode | FileNode;
@@ -30,7 +31,10 @@ export class ActivityTreeProvider implements vscode.TreeDataProvider<Node> {
     const base = node.file.split('/').pop() ?? node.file;
     const file = this.state.getFiles().find((f) => f.file === node.file);
     const item = new vscode.TreeItem(base, vscode.TreeItemCollapsibleState.None);
-    item.resourceUri = vscode.Uri.joinPath(this.workspaceRoot, node.file);
+    // Transcript events outside the workspace (e.g. a worktree) carry absolute paths.
+    item.resourceUri = path.isAbsolute(node.file)
+      ? vscode.Uri.file(node.file)
+      : vscode.Uri.joinPath(this.workspaceRoot, node.file);
     if (file) {
       item.description = file.lastDetail || node.file;
       item.tooltip = `${node.file}\n${file.reads} read(s), ${file.writes} write(s)`

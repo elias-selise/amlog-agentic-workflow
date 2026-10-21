@@ -235,6 +235,9 @@ async function main() {
     detail: range.detail,
     session: pick(input, ['session_id']) || '',
     toolUseId: pick(input, ['tool_use_id']) || '',
+    // Lets the extension find and tail the full session transcript (its
+    // primary source); these hook events are then only a fallback.
+    transcript: pick(input, ['transcript_path']) || undefined,
   };
 
   try {

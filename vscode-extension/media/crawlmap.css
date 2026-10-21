@@ -159,6 +159,7 @@ html, body {
 }
 .recap-step .op-r { color: rgba(120, 170, 230, 0.95); }
 .recap-step .op-w { color: rgba(230, 150, 90, 0.95); }
+.recap-step .op-s { color: rgba(180, 130, 230, 0.95); }
 
 #ticker {
   position: fixed;

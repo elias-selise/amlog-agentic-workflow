@@ -18,7 +18,7 @@
   let focusAgent = ''; // '' = all agents
 
   // op -> label icon and node tint
-  const OP_ICON = { read: '👁', write: '✎', search: '🔍', bash: '$' };
+  const OP_ICON = { read: '👁', write: '✎', search: '⌕', bash: '$' };
   function opFill(op, alpha) {
     if (op === 'write') { return `rgba(220,120,80,${alpha})`; }
     if (op === 'search') { return `rgba(180,120,230,${alpha})`; }
@@ -106,15 +106,25 @@
     ticks.unshift(`${when}  ${ev.agent}  ${OP_ICON[ev.op] || '•'}  ${ev.file}${detail}`);
     while (ticks.length > 6) { ticks.pop(); }
 
-    flow.push({ agent: ev.agent, color: ev.color, op: ev.op, file: ev.file, detail: ev.detail || '', when });
-    while (flow.length > 400) { flow.shift(); }
+    flow.push({ agent: ev.agent, color: ev.color, op: ev.op, file: ev.file, detail: ev.detail || '', caption: ev.caption || '', when });
+    while (flow.length > 5000) { flow.shift(); }
 
     renderTicker();
     renderStats();
-    if (recapVisible) { renderRecap(); }
+    if (recapVisible) { scheduleRecap(); }
   }
 
-  // A per-agent ordered recap of the flow: what each agent read/wrote, in order.
+  // Replays and bursts deliver many events at once; rebuild the recap at most
+  // a few times a second.
+  let recapTimer = 0;
+  function scheduleRecap() {
+    if (recapTimer) { return; }
+    recapTimer = setTimeout(() => { recapTimer = 0; renderRecap(); }, 250);
+  }
+
+  // A per-agent ordered recap of the whole flow: every read, edit and search
+  // each agent made, in order. The live Code Crawl may skip steps to keep up;
+  // this never does.
   function renderRecap() {
     const byAgent = new Map();
     for (const step of flow) {
@@ -142,16 +152,16 @@
       name.appendChild(dot);
       name.appendChild(label);
       group.appendChild(name);
-      // show the most recent ~18 steps for this agent
-      for (const step of info.steps.slice(-18)) {
+      for (const step of info.steps) {
         const row = document.createElement('div');
         row.className = 'recap-step';
+        row.title = [step.when, step.file, step.caption ? `“${step.caption}”` : ''].filter(Boolean).join('\n');
         const icon = document.createElement('span');
-        icon.className = step.op === 'write' ? 'op-w' : 'op-r';
+        icon.className = step.op === 'write' ? 'op-w' : step.op === 'search' ? 'op-s' : 'op-r';
         icon.textContent = OP_ICON[step.op] || '•';
         const text = document.createElement('span');
-        const base = step.file.split('/').pop() || step.file;
-        text.textContent = step.detail ? `${base} — ${step.detail}` : base;
+        const base = step.op === 'bash' ? '' : (step.file.split('/').pop() || step.file);
+        text.textContent = step.detail ? (base ? `${base} — ${step.detail}` : step.detail) : base;
         row.appendChild(icon);
         row.appendChild(text);
         group.appendChild(row);
