@@ -5,6 +5,7 @@ const ora = require('ora');
 const semver = require('semver');
 const { filterAgents, loadManifest } = require('../lib/manifest');
 const { installAgents, getInstalledTypes, getInstalledTools } = require('../lib/copy-agents');
+const { installActivityHook } = require('../lib/hooks');
 const { getAdapter } = require('../lib/adapters');
 const { isCodegraphInstalled, syncZones, wireCodegraph, refreshWindowsPath } = require('../lib/knowledge-base');
 const { ensureGitignoreEntries } = require('../lib/gitignore');
@@ -75,6 +76,17 @@ async function runUpdate(opts) {
   failed.forEach(r => console.log(chalk.red(`  ✗ [${r.tool}] ${r.agent.type}/${r.agent.name}: ${r.error}`)));
 
   ensureGitignoreEntries(WORKSPACE);
+
+  // Re-register the activity-capture hook (Claude Code only) so an update also
+  // repairs a missing/edited .claude/settings.json hook entry.
+  if (installedTools.includes('claude')) {
+    try {
+      const { installed } = installActivityHook(WORKSPACE);
+      console.log(chalk.green(`  ✓ ${installed ? 'Registered' : 'Verified'} activity-capture hook (.claude/settings.json)`));
+    } catch (err) {
+      console.log(chalk.yellow(`  ⚠  Could not register activity-capture hook: ${err.message}`));
+    }
+  }
 
   // Re-index zones so changes to .amlog/amlog-workflow.config.json (e.g. a newly added
   // zone) take effect without a full uninstall/reinstall.

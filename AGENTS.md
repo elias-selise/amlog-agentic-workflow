@@ -192,6 +192,55 @@ document (Appendix A) for convenience.
 
 ---
 
+## 6b. Agent activity capture (spider crawler feed)
+
+On `amlog install` / `amlog update` for the **Claude Code** adapter, the CLI wires
+a `PostToolUse` hook so every file an agent reads or writes is recorded. This is
+the data feed for the "spider crawler" visualization (the `vscode-extension/`
+package).
+
+- **Hook script:** `registry/hooks/amlog-activity-hook.js` is copied to
+  `.amlog/hooks/amlog-activity-hook.js`. It is dependency-free and fail-safe —
+  any error is swallowed and it always exits 0, so it can never break an agent's
+  tool call.
+- **Registration:** `src/lib/hooks.js` merges a `PostToolUse` entry (matcher
+  `Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob|Bash`) into `.claude/settings.json`,
+  preserving any existing settings/hooks. Idempotent; `amlog uninstall` removes it.
+- **Transcript is the primary source (extension ≥ 0.2.0):** each hook event also
+  carries `transcript` (the hook's `transcript_path`). The extension tails the
+  Claude Code session transcript (`~/.claude/projects/<encoded path>/<session>.jsonl`
+  plus `<session>/subagents/agent-<id>.jsonl`) for full detail: reads/searches
+  done through Bash (`grep`, `sed -n`, `cat`, `find`…), exact line ranges from the
+  tool results, search hits, the agent's one-line captions, and tokens/model/time.
+  Hook events for a session whose transcript is tracked are ignored; the hook file
+  is only the fallback.
+- **Agent trace file:** the extension writes each session into
+  `docs/<issue-number>/agent-trace.json` (next to `instructions.md`/`plan.md`; the
+  issue folder is the `docs/<n>/` the session touched most) — paths, line ranges,
+  queries/hit counts, captions and metrics, never file contents or tool output.
+  Sessions with no issue folder go to `.amlog/traces/<session>.json`.
+- **Output:** one NDJSON line per file touch appended to
+  `.amlog/activity/events.ndjson` (gitignored, size-rotated):
+  ```json
+  {"ts":"<ISO>","op":"read|write","file":"<workspace-relative>","agent":"<agent_type|main>","agentId":"…","tool":"Edit","startLine":42,"endLine":46,"lines":5,"detail":"edited 5 line(s) @ line 42","session":"…","toolUseId":"…"}
+  ```
+  The acting subagent is taken from the hook's `agent_type`/`agent_id` fields
+  (present only inside a subagent); the top-level session is labelled `main`.
+- **Line range / size:** derived from the tool's `tool_input` — the same facts
+  the terminal prints. `Read` uses `offset`/`limit` (`read lines 1-200`); `Write`
+  counts `content` lines; `Edit`/`MultiEdit` count `new_string` lines and locate
+  the start line by finding the text in the file (best-effort, size-capped).
+  `startLine`/`endLine`/`lines` are omitted when not derivable (e.g. a whole-file
+  read); the VS Code Code Crawl view uses them to crawl the exact lines.
+- **Claude-only for now:** per-agent labelling relies on Claude Code's hook
+  fields. Other adapters can emit the same NDJSON schema later without changing
+  the consumer.
+- **Execution metrics:** tokens/model/time are not in hook input; they come from
+  the transcript and are recorded per agent in `agent-trace.json` (`metrics`,
+  `agents[].tokens`).
+
+---
+
 ## 7. Full agent roster
 
 Every agent below needs an `agent.md` (the skill/definition) under
@@ -385,10 +434,13 @@ amlog-workflow/
 │   └── lib/
 │       ├── manifest.js            # reads/filters registry/manifest.json
 │       ├── copy-agents.js         # copies matching agent folders into .amlog/
+│       ├── hooks.js               # registers the Claude Code activity-capture hook (Section 6b)
 │       ├── detect-agent-cli.js    # finds CLAUDE.md / AGENTS.md / GEMINI.md etc.
 │       └── knowledge-base.js      # the CodeGraph bootstrap logic (Section 6)
 ├── registry/
 │   ├── manifest.json              # full agent registry — see Section 10 schema
+│   ├── hooks/
+│   │   └── amlog-activity-hook.js # PostToolUse hook → .amlog/activity/events.ndjson (Section 6b)
 │   ├── knowledge-base-setup/
 │   │   ├── agent.md
 │   │   └── scripts/

@@ -5,6 +5,7 @@ const fs = require('fs-extra');
 const chalk = require('chalk');
 const prompts = require('prompts');
 const { uninstallAgents, getInstalledAgents } = require('../lib/copy-agents');
+const { removeActivityHook } = require('../lib/hooks');
 
 const WORKSPACE = process.cwd();
 const AMLOG_DIR      = path.join(WORKSPACE, '.amlog');
@@ -39,6 +40,12 @@ async function runUninstall(opts) {
 
   const removed = await uninstallAgents(WORKSPACE);
   removed.forEach(r => console.log(chalk.green(`  ✓ Removed [${r.tool}] ${r.type}/${r.name}`)));
+
+  // Strip the activity-capture hook from .claude/settings.json (it lives
+  // outside .amlog/, so removing the directory below would otherwise orphan it).
+  if (removeActivityHook(WORKSPACE)) {
+    console.log(chalk.green('  ✓ Removed activity-capture hook from .claude/settings.json'));
+  }
 
   if (fs.existsSync(AMLOG_DIR)) {
     await fs.remove(AMLOG_DIR);
