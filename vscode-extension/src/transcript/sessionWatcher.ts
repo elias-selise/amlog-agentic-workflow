@@ -1,23 +1,27 @@
 import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { ActivityEvent } from '../types';
-import { ClaudeTranscriptParser } from './claudeTranscript';
+import { RecordParser } from './common';
+import { AntigravitySource } from './antigravitySource';
+import { ClaudeSource } from './claudeSource';
+import { CodexSource } from './codexSource';
+import { SessionSource, TailSpec } from './source';
 import { SessionTrace, writeTrace } from './traceStore';
 
-// Finds and tails Claude Code session transcripts for the workspace:
-//   <claude config>/projects/<encoded workspace path>/<session>.jsonl
-//   <claude config>/projects/<encoded workspace path>/<session>/subagents/agent-<id>.jsonl (+ .meta.json)
-// plus any transcript path the activity hook reports (sessions started from a
-// different directory, e.g. a worktree).
+// Follows the session logs of every enabled agent (Claude Code, Codex,
+// Antigravity) for the workspace. Each source discovers its own log files; this
+// class tails them, turns their records into events through the matching parser,
+// feeds the trace store, and writes trace files.
 //
 // Polling, not fs.watch: a handful of stat/read calls per tick is cheap, works
 // the same on every platform, and survives files appearing in new directories.
+
+export const ALL_SOURCES = ['claude', 'codex', 'antigravity'] as const;
 
 export interface WatcherOptions {
   root: string; // workspace folder
   lookbackMs: number; // replay sessions active within this window at startup
   pollMs: number;
+  sources?: string[]; // which agents to follow (default: all)
   traceFallbackDir?: string; // where traces go when no docs/<issue>/ is found
   writeTraces: boolean;
   onEvent: (event: ActivityEvent, live: boolean) => void;
@@ -25,12 +29,9 @@ export interface WatcherOptions {
   onError?: (message: string) => void;
 }
 
-interface Tail {
-  file: string;
-  session: string;
-  agent: string; // 'main' or the subagent's type
-  agentId: string; // '' for the main session
-  parser: ClaudeTranscriptParser;
+interface Tail extends TailSpec {
+  source: string;
+  parser: RecordParser;
   offset: number;
   partial: string;
   drainedOnce: boolean;
@@ -40,29 +41,31 @@ interface Tail {
 const MAX_BACKLOG_BYTES = 64 * 1024 * 1024;
 const TRACE_FLUSH_MS = 3000;
 
-export function claudeProjectsDir(): string {
-  const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  return path.join(base, 'projects');
-}
-
-// Claude Code names a project's transcript folder after its path with every
-// non-alphanumeric character replaced by '-'.
-export function projectDirFor(root: string): string {
-  return path.join(claudeProjectsDir(), root.replace(/[^A-Za-z0-9]/g, '-'));
-}
-
 export class SessionWatcher {
   readonly traces = new Map<string, SessionTrace>();
-  private readonly dirs = new Set<string>();
+  private readonly sources: SessionSource[];
+  private readonly claude?: ClaudeSource;
+  private readonly lastScan = new Map<string, number>();
   private readonly tails = new Map<string, Tail>();
-  private readonly sessions = new Set<string>(); // sessions whose main transcript is tailed
+  private readonly sessions = new Set<string>(); // sessions whose main log is tailed
   private readonly startedAt = Date.now();
   private readonly lastWritten = new Map<string, string>();
   private readonly pollTimer: ReturnType<typeof setInterval>;
   private readonly flushTimer: ReturnType<typeof setInterval>;
 
   constructor(private readonly opts: WatcherOptions) {
-    this.dirs.add(projectDirFor(opts.root));
+    const want = new Set(opts.sources ?? ALL_SOURCES);
+    this.sources = [];
+    if (want.has('claude')) {
+      this.claude = new ClaudeSource(opts.root);
+      this.sources.push(this.claude);
+    }
+    if (want.has('codex')) {
+      this.sources.push(new CodexSource(opts.root));
+    }
+    if (want.has('antigravity')) {
+      this.sources.push(new AntigravitySource(opts.root));
+    }
     this.scan();
     this.pollTimer = setInterval(() => this.scan(), opts.pollMs);
     this.flushTimer = setInterval(() => this.flush(), TRACE_FLUSH_MS);
@@ -72,16 +75,12 @@ export class SessionWatcher {
     return this.sessions.has(session);
   }
 
-  // A transcript path reported by the hook (may live outside the workspace's
-  // own project folder). Track it right away.
+  // A Claude Code transcript path reported by the hook (may live outside the
+  // workspace's own project folder). Follow it right away.
   addTranscript(file: string): void {
-    if (!file.endsWith('.jsonl')) {
-      return;
-    }
-    this.dirs.add(path.dirname(file));
-    if (!this.tails.has(file) && exists(file)) {
-      this.trackMain(file);
-      this.drain(this.tails.get(file) as Tail);
+    if (this.claude) {
+      this.claude.addTranscript(file);
+      this.scan();
     }
   }
 
@@ -91,21 +90,26 @@ export class SessionWatcher {
   }
 
   private scan(): void {
-    const cutoff = this.startedAt - this.opts.lookbackMs;
-    for (const dir of this.dirs) {
-      for (const name of list(dir)) {
-        if (!name.endsWith('.jsonl')) {
-          continue;
-        }
-        const file = path.join(dir, name);
-        if (!this.tails.has(file)) {
-          const st = stat(file);
-          if (!st || st.mtimeMs < cutoff) {
-            continue;
-          }
-          this.trackMain(file);
-        }
-        this.scanSubagents(dir, name.slice(0, -'.jsonl'.length));
+    const now = Date.now();
+    const ctx = {
+      root: this.opts.root,
+      cutoffMs: this.startedAt - this.opts.lookbackMs,
+      now,
+      hasTail: (file: string) => this.tails.has(file),
+    };
+    for (const source of this.sources) {
+      if (source.scanEveryMs && now - (this.lastScan.get(source.name) ?? 0) < source.scanEveryMs) {
+        continue;
+      }
+      this.lastScan.set(source.name, now);
+      let specs: TailSpec[] = [];
+      try {
+        specs = source.scan(ctx);
+      } catch (err) {
+        this.opts.onError?.(`AMLOG: could not scan ${source.name} sessions (${String(err)})`);
+      }
+      for (const spec of specs) {
+        this.track(source.name, spec);
       }
     }
     for (const tail of this.tails.values()) {
@@ -113,60 +117,38 @@ export class SessionWatcher {
     }
   }
 
-  private trackMain(file: string): void {
-    const session = path.basename(file, '.jsonl');
-    this.sessions.add(session);
-    this.tails.set(file, this.newTail(file, session, 'main', ''));
-  }
-
-  private scanSubagents(dir: string, session: string): void {
-    const subDir = path.join(dir, session, 'subagents');
-    for (const name of list(subDir)) {
-      const m = /^agent-(.+)\.jsonl$/.exec(name);
-      const file = path.join(subDir, name);
-      if (!m || this.tails.has(file)) {
-        continue;
-      }
-      const metaFile = path.join(subDir, `agent-${m[1]}.meta.json`);
-      const meta = readJson(metaFile);
-      // The meta file lands just after the transcript; wait briefly for it so
-      // the first events are labelled with the agent's type.
-      if (!meta && Date.now() - (stat(file)?.mtimeMs ?? 0) < 3000) {
-        continue;
-      }
-      const type = (meta && typeof meta.agentType === 'string' && meta.agentType) || 'subagent';
-      this.tails.set(file, this.newTail(file, session, type, m[1]));
-      if (meta && typeof meta.description === 'string') {
-        this.trace(session).describeAgent(type, m[1], meta.description);
-      }
+  private track(source: string, spec: TailSpec): void {
+    if (this.tails.has(spec.file)) {
+      return;
     }
-  }
-
-  private newTail(file: string, session: string, agent: string, agentId: string): Tail {
-    const size = stat(file)?.size ?? 0;
-    return {
-      file,
-      session,
-      agent,
-      agentId,
-      parser: new ClaudeTranscriptParser(this.opts.root, session, agent, agentId),
+    const size = fs.statSync(spec.file, { throwIfNoEntry: false })?.size ?? 0;
+    this.tails.set(spec.file, {
+      ...spec,
+      source,
       offset: size > MAX_BACKLOG_BYTES ? size : 0,
       partial: '',
       drainedOnce: false,
-    };
+    });
+    const trace = this.trace(spec.session, source);
+    if (!spec.agentId) {
+      this.sessions.add(spec.session);
+    } else if (spec.description) {
+      trace.describeAgent(spec.agent, spec.agentId, spec.description);
+    }
   }
 
-  private trace(session: string): SessionTrace {
+  private trace(session: string, source: string): SessionTrace {
     let t = this.traces.get(session);
     if (!t) {
       t = new SessionTrace(session);
+      t.source = source;
       this.traces.set(session, t);
     }
     return t;
   }
 
   private drain(tail: Tail): void {
-    const st = stat(tail.file);
+    const st = fs.statSync(tail.file, { throwIfNoEntry: false });
     if (!st) {
       return;
     }
@@ -196,7 +178,7 @@ export class SessionWatcher {
 
     const lines = (tail.partial + chunk).split('\n');
     tail.partial = lines.pop() ?? ''; // an in-flight append; finish it next time
-    const trace = this.trace(tail.session);
+    const trace = this.trace(tail.session, tail.source);
     for (const line of lines) {
       if (!line.trim()) {
         continue;
@@ -211,7 +193,7 @@ export class SessionWatcher {
       try {
         parsed = tail.parser.feed(rec);
       } catch (err) {
-        this.opts.onError?.(`AMLOG: could not read a transcript record (${String(err)})`);
+        this.opts.onError?.(`AMLOG: could not read a ${tail.source} record (${String(err)})`);
         continue;
       }
       if (!parsed) {
@@ -258,34 +240,5 @@ export class SessionWatcher {
     clearInterval(this.pollTimer);
     clearInterval(this.flushTimer);
     this.flush();
-  }
-}
-
-function list(dir: string): string[] {
-  try {
-    return fs.readdirSync(dir);
-  } catch {
-    return [];
-  }
-}
-
-function stat(file: string): fs.Stats | undefined {
-  try {
-    return fs.statSync(file);
-  } catch {
-    return undefined;
-  }
-}
-
-function exists(file: string): boolean {
-  return !!stat(file);
-}
-
-function readJson(file: string): Record<string, unknown> | undefined {
-  try {
-    const v = JSON.parse(fs.readFileSync(file, 'utf8'));
-    return v && typeof v === 'object' ? v : undefined;
-  } catch {
-    return undefined;
   }
 }

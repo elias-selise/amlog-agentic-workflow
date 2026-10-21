@@ -63,6 +63,7 @@ export function agentKey(agent: string, agentId: string): string {
 
 export class SessionTrace {
   title = '';
+  source = ''; // which agent wrote the session: claude | codex | antigravity
   cwd = '';
   gitBranch = '';
   pr?: { number: number; url: string; repository: string };
@@ -126,7 +127,9 @@ export class SessionTrace {
     }
     if (ev.query !== undefined) {
       step.query = this.redactor.text(ev.query);
-      step.hits = ev.hitCount ?? 0;
+      if (ev.hitCount !== undefined) {
+        step.hits = ev.hitCount; // absent when the agent's log doesn't say what it found
+      }
     }
     if (ev.caption) {
       step.caption = this.redactor.text(ev.caption);
@@ -199,6 +202,7 @@ export class SessionTrace {
     const ms = (a: string, b: string) => Math.max(0, Date.parse(b) - Date.parse(a)) || 0;
     return {
       title: this.title,
+      source: this.source || undefined,
       branch: this.gitBranch,
       redactions: this.redactor.count,
       startedAt: this.firstTs,

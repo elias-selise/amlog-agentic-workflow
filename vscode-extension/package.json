@@ -1,8 +1,8 @@
 {
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
-  "description": "Watch what your AI agents actually do: a line-drawn spider follows every read, edit and search (including grep/sed in Bash) live, and each issue gets a shareable agent-trace.json.",
-  "version": "0.3.1",
+  "description": "Watch what your AI agents actually do (Claude Code, Codex, Antigravity): a line-drawn spider follows every read, edit and search (including grep/sed in Bash) live, and each issue gets a shareable agent-trace.json.",
+  "version": "0.4.0",
   "publisher": "selise",
   "license": "MIT",
   "repository": {
@@ -137,6 +137,23 @@
           "type": "boolean",
           "default": true,
           "description": "Write each session into docs/<issue>/agent-trace.json (the folder holding the issue instructions.md / plan.md), or .amlog/traces/ when no issue folder is found."
+        },
+        "amlog.agentSources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "codex",
+              "antigravity"
+            ]
+          },
+          "default": [
+            "claude",
+            "codex",
+            "antigravity"
+          ],
+          "description": "Which agents' session logs to follow for this workspace (Claude Code, Codex CLI, Antigravity CLI). Only sessions that worked in this workspace (or another worktree of its repository) are read. Reload the window after changing."
         }
       }
     }

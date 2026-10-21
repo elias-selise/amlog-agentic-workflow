@@ -1,7 +1,7 @@
-import * as os from 'os';
 import * as path from 'path';
 import { ActivityEvent, SearchHit } from '../types';
-import { attributeHits, parseBash, parseHits } from './bashParse';
+import { parseHits } from './bashParse';
+import { shellEvents } from './shell';
 
 // Reads one Claude Code transcript file (the main session `<session>.jsonl` or a
 // subagent's `subagents/agent-<id>.jsonl`), record by record, and turns it into
@@ -11,64 +11,17 @@ import { attributeHits, parseBash, parseHits } from './bashParse';
 // versions, so every field is read defensively and unknown records are skipped.
 // No `vscode` import: this runs (and is tested) in plain Node.
 
-export interface UsageSample {
-  messageId: string;
-  model: string;
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheCreate: number;
-}
+import {
+  CAPTION_MAX, EventBuilder, ParsedRecord, RecordParser, Rec, isObj, num, oneLine, str,
+} from './common';
 
-export interface SpawnInfo {
-  toolUseId: string;
-  agentType: string;
-  description: string;
-  agentId?: string;
-}
-
-export type TranscriptMeta =
-  | { kind: 'title'; title: string }
-  | { kind: 'pr'; number: number; url: string; repository: string }
-  | { kind: 'cost'; costUSD: number; durationMs: number; linesAdded: number; linesRemoved: number }
-  | { kind: 'spawn'; spawn: SpawnInfo }
-  | { kind: 'context'; cwd: string; gitBranch: string };
-
-export interface ParsedRecord {
-  ts: string;
-  events: ActivityEvent[];
-  usage?: UsageSample;
-  meta: TranscriptMeta[];
-}
+export type { ParsedRecord, SpawnInfo, TranscriptMeta, UsageSample } from './common';
+export { displayPath } from './common';
 
 interface PendingTool {
   name: string;
   input: Record<string, unknown>;
   caption?: string;
-}
-
-const MAX_HITS = 50;
-const CAPTION_MAX = 220;
-
-type Rec = Record<string, unknown>;
-const isObj = (v: unknown): v is Rec => !!v && typeof v === 'object' && !Array.isArray(v);
-const str = (v: unknown): string => (typeof v === 'string' ? v : '');
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-
-export function displayPath(root: string, abs: string): string {
-  const rel = path.relative(root, abs);
-  if (rel === '') {
-    return '.';
-  }
-  if (!rel.startsWith('..') && !path.isAbsolute(rel)) {
-    return rel.split(path.sep).join('/');
-  }
-  return abs.split(path.sep).join('/');
-}
-
-function oneLine(text: string, max: number): string {
-  const t = text.replace(/[`*_#>]+/g, '').replace(/\s+/g, ' ').trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
 // Lines actually changed in the new file, from a structuredPatch:
@@ -103,28 +56,19 @@ function changedRange(patch: unknown): { start?: number; end?: number; added: nu
   return { start, end, added };
 }
 
-// The agent's own scratch space (temp dirs, Claude's config/memory folder) is
-// not code it is working on; it stays out of the views and the trace.
-const SCRATCH_ROOTS = [os.tmpdir(), '/tmp', process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')]
-  .map((p) => path.resolve(p) + path.sep);
-
-export class ClaudeTranscriptParser {
+export class ClaudeTranscriptParser implements RecordParser {
   private readonly pending = new Map<string, PendingTool>();
   private lastText = '';
   private contextSent = false;
+  private readonly b: EventBuilder;
 
   constructor(
     private readonly root: string, // workspace root, for display paths
-    private readonly session: string,
-    private readonly agent: string, // 'main' or the subagent's type
-    private readonly agentId: string,
-  ) {}
-
-  private isNoise(abs: string): boolean {
-    if (!abs || abs.startsWith(this.root + path.sep)) {
-      return false;
-    }
-    return SCRATCH_ROOTS.some((r) => abs.startsWith(r));
+    session: string,
+    agent: string, // 'main' or the subagent's type
+    agentId: string,
+  ) {
+    this.b = new EventBuilder(root, session, agent, agentId);
   }
 
   feed(rec: unknown): ParsedRecord | null {
@@ -228,32 +172,6 @@ export class ClaudeTranscriptParser {
     }
   }
 
-  private base(op: ActivityEvent['op'], tool: string, abs: string, toolUseId: string, ts: string): ActivityEvent {
-    return {
-      ts,
-      op,
-      file: abs ? displayPath(this.root, abs) : '(bash)',
-      absFile: abs || undefined,
-      agent: this.agent,
-      agentId: this.agentId,
-      tool,
-      session: this.session,
-      toolUseId,
-    };
-  }
-
-  private search(tool: string, rootAbs: string, query: string, hitsAbs: SearchHit[], id: string, ts: string, label: string): ActivityEvent {
-    const ev = this.base('search', tool, rootAbs, id, ts);
-    const files = new Set(hitsAbs.map((h) => h.file));
-    ev.query = query;
-    ev.hitCount = hitsAbs.length;
-    ev.hits = hitsAbs.slice(0, MAX_HITS).map((h) => ({ ...h, file: displayPath(this.root, h.file), text: h.text ? h.text.slice(0, 200) : undefined }));
-    ev.detail = hitsAbs.length
-      ? `${label} → ${hitsAbs.length} hit(s) in ${files.size} file(s)`
-      : `${label} → no hits`;
-    return ev;
-  }
-
   private toolEvents(
     tool: PendingTool,
     tur: Rec,
@@ -274,10 +192,10 @@ export class ClaudeTranscriptParser {
         }
         const f = isObj(tur.file) ? tur.file : {};
         const file = abs(str(f.filePath) || str(input.file_path));
-        if (!file || this.isNoise(file)) {
+        if (!file || this.b.isNoise(file)) {
           return [];
         }
-        const ev = this.base('read', 'Read', file, id, ts);
+        const ev = this.b.base('read', 'Read', file, id, ts);
         const start = num(f.startLine) ?? num(input.offset) ?? 1;
         const count = num(f.numLines) ?? num(input.limit);
         const total = num(f.totalLines);
@@ -302,10 +220,10 @@ export class ClaudeTranscriptParser {
           return [];
         }
         const file = abs(str(tur.filePath) || str(input.file_path) || str(input.notebook_path));
-        if (!file || this.isNoise(file)) {
+        if (!file || this.b.isNoise(file)) {
           return [];
         }
-        const ev = this.base('write', tool.name, file, id, ts);
+        const ev = this.b.base('write', tool.name, file, id, ts);
         const patch = changedRange(tur.structuredPatch);
         if (tool.name === 'Write' && (tur.type === 'create' || !patch.start)) {
           const n = str(input.content).split(/\r?\n/).length;
@@ -330,7 +248,7 @@ export class ClaudeTranscriptParser {
           return [];
         }
         const rootAbs = abs(str(input.path) || '.');
-        if (this.isNoise(rootAbs)) {
+        if (this.b.isNoise(rootAbs)) {
           return [];
         }
         const query = str(input.pattern);
@@ -341,34 +259,29 @@ export class ClaudeTranscriptParser {
         } else {
           hits = parseHits(content, { file: rootAbs, listsFiles }, cwd);
         }
-        return [this.search(tool.name, rootAbs, query, hits, id, ts, `${tool.name.toLowerCase()} "${query.slice(0, 48)}"`)];
+        return [this.b.search(tool.name, rootAbs, query, hits, id, ts, `${tool.name.toLowerCase()} "${query.slice(0, 48)}"`)];
       }
 
-      case 'Bash': {
-        const command = str(input.command);
-        const actions = parseBash(command, cwd).filter((a) => !this.isNoise(a.file));
-        const searches = actions.filter((a) => a.kind === 'search');
-        const hitsBySearch = attributeHits(str(tur.stdout) || content, searches, cwd);
-        const events: ActivityEvent[] = [];
-        for (const a of actions) {
-          if (a.kind === 'search') {
-            const hits = hitsBySearch[searches.indexOf(a)].filter((h) => !this.isNoise(h.file));
-            events.push(this.search(a.tool, a.file, a.query ?? '', hits, id, ts, a.detail));
-          } else if (!isError) {
-            const ev = this.base(a.kind, a.tool, a.file, id, ts);
-            ev.startLine = a.startLine;
-            ev.endLine = a.endLine;
-            ev.detail = a.detail;
-            events.push(ev);
-          }
+      case 'Bash':
+        return shellEvents(
+          this.b,
+          [{ command: str(input.command), cwd }],
+          str(tur.stdout) || content,
+          isError,
+          id,
+          ts,
+          str(input.description),
+        );
+
+      // The CodeGraph MCP tool is how agents map a codebase: a search whose
+      // results the log does not itemise.
+      case 'mcp__codegraph__codegraph_explore': {
+        if (isError) {
+          return [];
         }
-        if (!events.length) {
-          const ev = this.base('bash', 'Bash', '', id, ts);
-          const desc = str(input.description) || command;
-          ev.detail = `$ ${oneLine(desc, 80)}`;
-          events.push(ev);
-        }
-        return events;
+        const query = str(input.query);
+        const projectAbs = abs(str(input.projectPath) || '.');
+        return [this.b.search('codegraph_explore', projectAbs, query, undefined, id, ts, `codegraph "${query.slice(0, 48)}"`)];
       }
 
       case 'Agent':

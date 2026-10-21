@@ -71,6 +71,11 @@ test('find -name keeps a name matcher and ignores a piped find', () => {
   assert.deepEqual(acts('ls | find . -name x'), []);
 });
 
+test('find that deletes or executes is not a search', () => {
+  assert.deepEqual(acts('find dist -mindepth 1 -delete'), []);
+  assert.deepEqual(acts('find . -name "*.log" -exec rm {} ;'), []);
+});
+
 test('redirects and tee write files; fd duplication and /dev/null do not', () => {
   assert.deepEqual(acts('echo hi >> log.txt 2>&1'), [['write', 'redirect', '/w/log.txt', undefined, undefined]]);
   assert.deepEqual(acts('echo hi > out.txt'), [['write', 'redirect', '/w/out.txt', undefined, undefined]]);

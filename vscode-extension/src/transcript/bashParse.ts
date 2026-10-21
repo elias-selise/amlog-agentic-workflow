@@ -411,6 +411,10 @@ function headTail(tool: 'head' | 'tail', args: string[], cwd: string, vars: Map<
 }
 
 function findAction(tool: string, args: string[], cwd: string, vars: Map<string, string>): BashAction[] {
+  // `find … -delete` / `-exec …` act on what they find; that is not a search.
+  if (args.some((a) => a === '-delete' || a === '-exec' || a === '-execdir' || a === '-ok')) {
+    return [];
+  }
   // find ROOT... EXPR — roots are the leading args that aren't options/expressions.
   const roots: string[] = [];
   let i = 0;
