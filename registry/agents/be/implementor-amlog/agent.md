@@ -14,7 +14,7 @@ Execute the back-end implementation plan, writing production-quality code that p
 
 ## Instructions
 1. Read `.amlog/history/implementor-amlog-be.md` if it exists. Note the `Lesson for next run` line from up to the 5 most recent entries and apply it to this run.
-2. Read the implementation plan from `docs/<issue-number>/plan.md`.
+2. Read the implementation plan from `docs/<issue-number>/plan.md`. If you were sent here by `bug-triage-amlog` with BUG ids, also read each `.amlog/qa/bugs/<issue-number>/BUG-<n>.md`: fix the root cause it names rather than the symptom, never edit or weaken the failing test to get green, and say in your summary which BUG ids you addressed.
 3. Use `codegraph_explore` on codebase to understand existing controller, service, and repository patterns before writing any code, and check what you observe against `.amlog/skills/dotnet/SKILL.md`. If the codebase has drifted from what's written there (a new pattern adopted, a documented convention no longer used), update the skill file's relevant bullets in place to match reality — edit additively/correctively, don't remove sections, and if you're not confident a change is real, leave the bullet as-is and just note the discrepancy instead of editing. State in your summary what you updated, or that no update was needed.
 4. Read the (now current) `.amlog/skills/dotnet/SKILL.md` and apply its implementation guidance for the remaining steps.
 5. Create or modify controllers, services, repositories, DTOs, and validators exactly as specified in the plan, applying the skill's implementation guidance (naming/namespace/DI conventions, validation, test patterns).

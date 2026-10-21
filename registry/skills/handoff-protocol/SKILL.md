@@ -52,6 +52,7 @@ If there are parallel handoffs (two `NEXT AGENT:` lines from one trigger), check
 | Plan review | `planner-amlog` (fe/be) | The developer's approval of `docs/<issue-number>/plan.md` |
 | Visual verification | `browser-launcher-amlog` | The human's visual check of the implemented UI (screenshots or the running app) |
 | Test cases | `test-generator-amlog` | The tester's own edge and corner cases |
+| Bug filing | `bug-triage-amlog` | Approval to file the drafted bugs on GitHub, or to skip filing |
 | Commit / PR | `github-manager-amlog` | Approval of the commit message, and confirmation of the PR source and target branches |
 | Loop limit | any agent | See `ASK_HUMAN` above |
 

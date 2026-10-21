@@ -52,7 +52,7 @@ In short, one command gives your AI coding assistant(s):
 |---|---|
 | `--frontend` | planner, implementor (Angular), browser-launcher + all `dev` agents |
 | `--backend` | planner, implementor (.NET), test-runner + all `dev` agents |
-| `--qa` | test-generator, test-executor |
+| `--qa` | test-generator, test-executor, bug-triage, plus the optional api-contract-tester (back-end changes) and e2e-tester (front-end changes) |
 | `--ba` | story-writer, github-manager-ba |
 | `--all` | everything above |
 
@@ -338,8 +338,11 @@ A fresh install lists `frontend`, `backend`, `database` and `qa` under `zones` (
 | `planner-amlog` | `be` | planning | — | `dotnet` | ✅ Developer must confirm the plan |
 | `implementor-amlog` | `be` | build | — | `dotnet` | — |
 | `test-runner-amlog` | `be` | build | ✅ `run-affected-tests.sh` | — | — |
-| `test-generator-amlog` | `qa` | qa | — | — | ✅ Tester must add edge/corner cases |
-| `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` | — | — |
+| `test-generator-amlog` | `qa` | qa | — | `qa-scope` | ✅ Tester must add edge/corner cases |
+| `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` | `qa-scope` | — |
+| `api-contract-tester-amlog` | `qa` | qa | ✅ `run-contract-tests.sh` | `api-contract-testing`, `qa-scope` | — (optional: runs only when the back end changed) |
+| `e2e-tester-amlog` | `qa` | qa | ✅ `run-e2e.sh` | `e2e-testing`, `webapp-testing`, `qa-scope` | — (optional: runs only when the front end changed) |
+| `bug-triage-amlog` | `qa` | qa | ✅ `bug-index.js` | `bug-triage`, `qa-scope` | ✅ Human approves filing the drafted bugs on GitHub |
 
 Run `amlog list` anytime to see this same roster pulled live from the registry.
 
@@ -465,7 +468,11 @@ A **skill** is reusable knowledge factored out of individual agents so the same 
 | `react` | `planner-amlog` (fe), `implementor-amlog` (fe) | Component/hook structure, API data flow via existing data-fetching layer, Redux/Zustand/Context state, naming/folder conventions, build/lint/test verification |
 | `dotnet` | `planner-amlog` (be), `implementor-amlog` (be) | Layered architecture (Controllers/Services/Repositories/DTOs), API contract, FluentValidation, `dotnet build`/`dotnet test` verification |
 | `handoff-protocol` | every agent that hands off | Process skill, not codebase knowledge: the loop guard, `auto_handover`, the mandatory human gates, and the `NEXT AGENT:` / `HUMAN INPUT REQUIRED:` final lines. Agents never self-edit it. |
-| `webapp-testing` | `browser-launcher-amlog` (fe) | Playwright-driven headless browser verification — adapted from Anthropic's official `webapp-testing` skill (Apache-2.0; see `registry/skills/webapp-testing/THIRD_PARTY_NOTICE.md`) |
+| `qa-scope` | every `qa` agent | Process skill: which optional tester applies (`detect-scope.js` → `.amlog/qa/scope.json`), the QA chain order, and the standard `.amlog/qa/<name>-report.json` schema every tester writes. Agents never self-edit it. |
+| `api-contract-testing` | `api-contract-tester-amlog` (qa) | Finding the contract (OpenAPI → code → front-end consumer → AC), the per-endpoint checklist (status, schema, validation, auth/IDOR, boundaries, idempotency), .NET test conventions, breaking-change rules, fuzzing |
+| `e2e-testing` | `e2e-tester-amlog` (qa) | Choosing journeys from the AC, stable selectors, deterministic waits and test data, console/network + accessibility + responsive checks, flake control, failure evidence |
+| `bug-triage` | `bug-triage-amlog` (qa) | Failure classification (product bug / test bug / contract drift / environment / flaky), severity + priority rubric, root-cause localisation, minimal repro, de-duplication, the bug report template |
+| `webapp-testing` | `browser-launcher-amlog` (fe), `e2e-tester-amlog` (qa) | Playwright-driven headless browser verification — adapted from Anthropic's official `webapp-testing` skill (Apache-2.0; see `registry/skills/webapp-testing/THIRD_PARTY_NOTICE.md`) |
 
 Both `angular` and `react` are installed for every `fe` agent, but only one is *applied* per run: `planner-amlog`/`implementor-amlog` detect the target codebase's framework (via `package.json` dependencies or file extensions) and load the matching skill, so the same agent works unmodified against either stack.
 
@@ -475,7 +482,7 @@ Both `angular` and `react` are installed for every `fe` agent, but only one is *
 
 ## Agent flow: the full cycle
 
-This is not a linear pipeline. Every build-stage gate can bounce work back to an implementor, and dev-side self-verification (browser/test-runner → security → quality → review) runs as a track parallel to QA (test-generator → test-executor) — both converge on `github-manager-amlog` before merge. `github-manager-amlog` itself appears twice below because it's invoked at two different points in the cycle (kicking off work, and again at PR time) — it's one agent, not two.
+This is not a linear pipeline. Every build-stage gate can bounce work back to an implementor, and dev-side self-verification (browser/test-runner → security → quality → review) runs as a track parallel to QA (test-generator → optional api-contract-tester / e2e-tester → test-executor, with bug-triage catching every failure) — both converge on `github-manager-amlog` before merge. `github-manager-amlog` itself appears twice below because it's invoked at two different points in the cycle (kicking off work, and again at PR time) — it's one agent, not two.
 
 ![Agent flow: the full cycle](https://raw.githubusercontent.com/elias-selise/amlog-agentic-workflow/main/docs/images/agent-flow-full-cycle.png)
 
@@ -508,7 +515,11 @@ flowchart TD
 
     TGEN["test-generator-amlog"]
     G3{"Tester adds edge /<br/>corner cases?"}
+    API["api-contract-tester-amlog<br/>(optional: back end changed)"]
+    E2E["e2e-tester-amlog<br/>(optional: front end changed)"]
     TEXEC["test-executor-amlog<br/>(accepted / open-items / rejected)"]
+    TRIAGE["bug-triage-amlog<br/>(classify, dedupe, route)"]
+    G4{"Human approves<br/>bug filing?"}
 
     GHMPR["github-manager-amlog<br/>(PR + plan-as-comment<br/>+ corrections capture)"]
     KBCUR["kb-curator-amlog<br/>(planned, not yet built)"]
@@ -549,21 +560,31 @@ flowchart TD
     IFE -. parallel QA track .-> TGEN
     IBE -. parallel QA track .-> TGEN
     TGEN --> G3
-    G3 -- input added --> TEXEC
+    G3 -- back end changed --> API
+    G3 -- front end only --> E2E
+    G3 -- neither applies --> TEXEC
+    API -- pass / skipped, front end changed --> E2E
+    API -- pass / skipped, back end only --> TEXEC
+    API -- fail --> TRIAGE
+    E2E -- pass / flaky / skipped --> TEXEC
+    E2E -- fail --> TRIAGE
     TEXEC -- accepted / accepted-with-open-items --> GHMPR
-    TEXEC -- rejected: flaky only --> TGEN
-    TEXEC -- rejected: hard failure --> IFE
-    TEXEC -- rejected: hard failure --> IBE
+    TEXEC -- rejected: coverage only --> TGEN
+    TEXEC -- rejected: hard failure --> TRIAGE
+    TRIAGE --> G4
+    G4 -- product bug, front end --> IFE
+    G4 -- product bug, back end --> IBE
+    G4 -- test bug / flaky --> TGEN
 
     GHMPR -- PR merged --> KBCUR
 
     classDef gate fill:#fff3cd,stroke:#d97757,color:#333;
-    class G1,G2,G3 gate;
+    class G1,G2,G3,G4 gate;
 ```
 
 </details>
 
-The three diamonds (`G1`, `G2`, `G3`) are the hard human-in-the-loop stops — see the next section. `kb-curator-amlog` is drawn dashed-in-concept because it's documented in [`AGENTS.md`](AGENTS.md) as part of the intended roster but isn't built yet; the handoff to it is a forward reference.
+The four diamonds (`G1`–`G4`) are the hard human-in-the-loop stops — see the next section. `kb-curator-amlog` is drawn dashed-in-concept because it's documented in [`AGENTS.md`](AGENTS.md) as part of the intended roster but isn't built yet; the handoff to it is a forward reference.
 
 ---
 
@@ -576,6 +597,7 @@ These points in the cycle are hard stops. The agent must get an explicit human r
 | **BA approval** | `story-writer-amlog` | Explicit confirmation of the AC and story description. A request for changes sends the agent back to revise and re-confirm — it never hands off on an unconfirmed story. |
 | **Developer plan review** | `planner-amlog` (fe/be) | The developer's review of the written plan, before `implementor-amlog` starts coding. Requested changes loop back into the plan; even "proceed as-is" requires an explicit response. |
 | **Tester edge-case input** | `test-generator-amlog` | The tester's own edge/corner cases, on top of whatever the agent identified autonomously, before any test is written. |
+| **Bug filing** | `bug-triage-amlog` | Before anything is filed on GitHub, the human sees the drafted bugs (severity, owner, repro) and approves filing, edits them, or skips. The local reports in `.amlog/qa/bugs/<issue-number>/` are always written; only the outward-facing GitHub step waits. |
 | **Visual verification** | `browser-launcher-amlog` | Once the automated AC check passes, a human looks at the screenshots (desktop + mobile) or the running app and confirms the UI. A reported problem goes back to `implementor-amlog` (fe). |
 | **Commit / PR approval** | `github-manager-amlog` | Approval of the drafted commit message, and confirmation of the PR source and target branches. |
 | **Loop limit** | any agent | The same handoff for the same issue would happen for the `max_handoff_repeats`-th time. See [Handoff automation & loop guard](#handoff-automation--loop-guard). |
@@ -604,10 +626,42 @@ This is a different mechanism from the self-updating skills above: skills track 
 | Verdict | Meaning | Blocks merge? |
 |---|---|---|
 | `accepted` | Clean run: no failures, no flaky suites, no coverage regression, coverage at/above the 80% floor. | No |
-| `accepted-with-open-items` | No hard failures, but at least one of: a flaky suite, a coverage-regression warning, or missing/failing security-tagged tests. | No — visible, not blocking |
-| `rejected` | Any hard test failure, or coverage below the 80% floor. | Yes |
+| `accepted-with-open-items` | No hard failures, but at least one of: a flaky suite or tester report, a coverage-regression warning, missing/failing security-tagged tests, an optional tester that errored or found no tests, or a required tester that wrote no report. | No — visible, not blocking |
+| `rejected` | Any hard test failure, coverage below the 80% floor, an API contract or E2E failure, or an open/regressed S1/S2 bug in the bug ledger. | Yes |
 
 The underlying `scripts/run-test-suite.sh` retries each suite once before calling it flaky, extracts real coverage percentages, and ratchets a git-committed `docs/qa/coverage-baseline.json` forward only on a fully green run — so the regression check always compares against the last known-good number, and a partial run (e.g. only the backend) never nulls out the other stack's baseline.
+
+---
+
+## QA chain: optional testers and bug triage
+
+```
+test-generator → api-contract-tester → e2e-tester → test-executor → github-manager
+                        │                   │              │
+                        └──── any failure ──┴──────────────┴──→ bug-triage → implementor (fe|be) / test-generator
+```
+
+**Only the side that changed gets tested.** `.amlog/skills/qa-scope/scripts/detect-scope.js` looks at the committed diff vs `main` plus the working tree under the front-end and back-end roots (`FRONTEND_ROOT`/`BACKEND_ROOT`, else `zones` in `.amlog/amlog-workflow.config.json`) and writes `.amlog/qa/scope.json`:
+
+| Change | `api-contract-tester-amlog` | `e2e-tester-amlog` |
+|---|---|---|
+| Back end only | runs | skipped — "no front-end changes" |
+| Front end only | skipped — "no back-end changes" | runs |
+| Full stack | runs first | runs only if the API contract passed; otherwise skipped as "blocked by API contract failure" |
+
+A skip is never silent: the skipped tester still writes a report with the reason, and `test-executor-amlog` lists it. Each tester also picks a depth — `smoke` when only internals changed, `full` when the API surface (controllers, DTOs, validators, OpenAPI) or UI surface (templates, routes, components, styles) changed.
+
+**What each new agent adds**
+
+| Agent | Beyond the unit tests |
+|---|---|
+| `api-contract-tester-amlog` | Per-endpoint checklist (success shape, 400 validation, 401/403/IDOR, 404/409, boundaries, error hygiene) as tagged xUnit tests that follow the repo's existing integration-test style; OpenAPI breaking-change diff against `main` (`oasdiff`); optional schema-driven fuzzing of the running API (`schemathesis`) |
+| `e2e-tester-amlog` | Durable journey specs derived from the AC (Playwright by default, or the repo's own Cypress/Playwright suite); fails on console errors and unexpected 4xx/5xx; axe accessibility check; desktop + mobile; one retry so flaky tests are reported as `flaky`, never `pass`; screenshots and traces as evidence |
+| `bug-triage-amlog` | Classifies every failure (product bug / test bug / contract drift / environment / flaky), rates severity S1–S4 and priority P1–P3, points at the likely code with `codegraph_explore`, writes a minimal repro, fingerprints and de-duplicates across runs (`.amlog/qa/bugs.json`), files approved bugs on GitHub, and routes each one to the right agent — environment problems go to a human, never to an implementor |
+
+**Standard report file.** Every tester writes `.amlog/qa/<name>-report.json` (`status`: `pass` / `fail` / `flaky` / `skipped` / `error` / `no-tests`, totals, failures with category + AC + evidence). `error` and `no-tests` are never treated as a pass. `test-executor-amlog` and `bug-triage-amlog` read these instead of scraping console output.
+
+**Bug lifecycle.** `new` → (filed, fixed) → `verified-fixed` when a later run no longer fails → `regressed` if it fails again. A repeat of a known bug raises its occurrence count instead of creating a duplicate issue.
 
 ---
 
@@ -639,6 +693,9 @@ Shows:
 | [CodeGraph](https://github.com/colbymchenry/codegraph) | Auto-installed by `amlog install` |
 | [GitHub CLI (`gh`)](https://cli.github.com/) | Optional — enables auto-PR + issue-comment fallback in `github-manager-amlog` |
 | SonarQube + `sonar-scanner` | Optional — required by `code-quality-amlog` |
+| [`oasdiff`](https://github.com/oasdiff/oasdiff) | Optional — enables the OpenAPI breaking-change diff in `api-contract-tester-amlog` (skipped, with a note, if missing) |
+| [`schemathesis`](https://schemathesis.readthedocs.io/) | Optional — enables schema-driven fuzzing in `api-contract-tester-amlog` (`CONTRACT_FUZZ=1`) |
+| Playwright for Node (`@playwright/test`) or Cypress in the front-end repo | `e2e-tester-amlog` uses the suite the repo already has; if there is none it bootstraps Playwright |
 | Python 3 + [Playwright](https://playwright.dev/python/) (`pip install playwright && python3 -m playwright install chromium`) | Required by `browser-launcher-amlog`'s `webapp-testing` skill — the one non-Node/bash dependency in the toolkit |
 
 ---
