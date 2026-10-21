@@ -478,68 +478,74 @@ export function parseBash(command: string, cwd: string): BashAction[] {
       words = words.slice(assigns);
     }
 
-    // Output redirection writes a file, whatever the command.
+    // Output redirection writes a file, whatever the command. It is recorded
+    // after the command's own reads (`cat a > b` reads a, then writes b).
+    const redirWrites: BashAction[] = [];
     for (const r of seg.redirs) {
       if (r.op === '>' || r.op === '>>') {
         const t = expand(r.target, vars);
         if (t && !isNoise(resolvePath(dir, t)) && !/^\d$/.test(t)) {
-          actions.push({ kind: 'write', tool: 'redirect', file: resolvePath(dir, t), detail: r.op === '>>' ? 'appended (>>)' : 'wrote (>)' });
+          redirWrites.push({ kind: 'write', tool: 'redirect', file: resolvePath(dir, t), detail: r.op === '>>' ? 'appended (>>)' : 'wrote (>)' });
         }
       }
     }
-    if (!words.length) {
-      continue;
-    }
 
-    const prog = path.basename(words[0]);
-    const args = words.slice(1);
-
-    if (prog === 'cd') {
-      const target = expand(args[0] ?? '~', vars);
-      if (target) {
-        dir = resolvePath(dir, target);
+    command: {
+      if (!words.length) {
+        break command;
       }
-      continue;
-    }
-    if (prog === 'export') {
-      for (const a of args) {
-        const m = ASSIGN.exec(a);
-        if (m) {
-          const v = expand(m[2], vars);
-          if (v !== null) {
-            vars.set(m[1], v);
+
+      const prog = path.basename(words[0]);
+      const args = words.slice(1);
+
+      if (prog === 'cd') {
+        const target = expand(args[0] ?? '~', vars);
+        if (target) {
+          dir = resolvePath(dir, target);
+        }
+        break command;
+      }
+      if (prog === 'export') {
+        for (const a of args) {
+          const m = ASSIGN.exec(a);
+          if (m) {
+            const v = expand(m[2], vars);
+            if (v !== null) {
+              vars.set(m[1], v);
+            }
+          }
+        }
+        break command;
+      }
+      if (prog === 'for' || prog === 'case' || prog === 'function') {
+        break command;
+      }
+
+      if ((prog === 'grep' || prog === 'egrep' || prog === 'fgrep' || prog === 'rg' || prog === 'ag' || prog === 'ack') && seg.pipePos === 0) {
+        actions.push(...grepLike(prog === 'egrep' || prog === 'fgrep' ? 'grep' : prog, args, dir, vars));
+      } else if (prog === 'git' && args[0] === 'grep' && seg.pipePos === 0) {
+        actions.push(...grepLike('git grep', args.slice(1), dir, vars));
+      } else if (prog === 'sed') {
+        actions.push(...sedAction(args, dir, vars));
+      } else if (prog === 'cat' || prog === 'bat' || prog === 'batcat' || prog === 'nl' || prog === 'less' || prog === 'more') {
+        const files = args.filter((a) => !a.startsWith('-')).map((f) => expand(f, vars)).filter((f): f is string => !!f && !hasGlob(f));
+        for (const f of files) {
+          actions.push({ kind: 'read', tool: prog, file: resolvePath(dir, f), detail: `${prog} (whole file)` });
+        }
+      } else if (prog === 'head' || prog === 'tail') {
+        actions.push(...headTail(prog, args, dir, vars));
+      } else if ((prog === 'find' || prog === 'fd' || prog === 'fdfind') && seg.pipePos === 0) {
+        actions.push(...findAction(prog === 'find' ? 'find' : 'fd', args, dir, vars));
+      } else if (prog === 'tee') {
+        for (const f of args.filter((a) => !a.startsWith('-'))) {
+          const t = expand(f, vars);
+          if (t) {
+            actions.push({ kind: 'write', tool: 'tee', file: resolvePath(dir, t), detail: 'wrote (tee)' });
           }
         }
       }
-      continue;
     }
-    if (prog === 'for' || prog === 'case' || prog === 'function') {
-      continue;
-    }
-
-    if ((prog === 'grep' || prog === 'egrep' || prog === 'fgrep' || prog === 'rg' || prog === 'ag' || prog === 'ack') && seg.pipePos === 0) {
-      actions.push(...grepLike(prog === 'egrep' || prog === 'fgrep' ? 'grep' : prog, args, dir, vars));
-    } else if (prog === 'git' && args[0] === 'grep' && seg.pipePos === 0) {
-      actions.push(...grepLike('git grep', args.slice(1), dir, vars));
-    } else if (prog === 'sed') {
-      actions.push(...sedAction(args, dir, vars));
-    } else if (prog === 'cat' || prog === 'bat' || prog === 'batcat' || prog === 'nl' || prog === 'less' || prog === 'more') {
-      const files = args.filter((a) => !a.startsWith('-')).map((f) => expand(f, vars)).filter((f): f is string => !!f && !hasGlob(f));
-      for (const f of files) {
-        actions.push({ kind: 'read', tool: prog, file: resolvePath(dir, f), detail: `${prog} (whole file)` });
-      }
-    } else if (prog === 'head' || prog === 'tail') {
-      actions.push(...headTail(prog, args, dir, vars));
-    } else if ((prog === 'find' || prog === 'fd' || prog === 'fdfind') && seg.pipePos === 0) {
-      actions.push(...findAction(prog === 'find' ? 'find' : 'fd', args, dir, vars));
-    } else if (prog === 'tee') {
-      for (const f of args.filter((a) => !a.startsWith('-'))) {
-        const t = expand(f, vars);
-        if (t) {
-          actions.push({ kind: 'write', tool: 'tee', file: resolvePath(dir, t), detail: 'wrote (tee)' });
-        }
-      }
-    }
+    actions.push(...redirWrites);
     for (let k = actions.length - 1; k >= 0 && actions[k].cwd === undefined; k--) {
       actions[k].cwd = dir;
     }

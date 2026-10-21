@@ -2,7 +2,7 @@
   "name": "amlog-spider-crawler",
   "displayName": "AMLOG Spider Crawler",
   "description": "Watch what your AI agents actually do: a line-drawn spider follows every read, edit and search (including grep/sed in Bash) live, and each issue gets a shareable agent-trace.json.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "selise",
   "license": "MIT",
   "repository": {
@@ -146,7 +146,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package --no-dependencies",
-    "pack:vsix": "npm run compile && node scripts/pack-vsix.js"
+    "pack:vsix": "npm run compile && node scripts/pack-vsix.js",
+    "test": "npm run compile && node --test \"test/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^18.19.0",
