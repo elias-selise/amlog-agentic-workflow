@@ -4,7 +4,7 @@ type: qa
 stage: qa
 description: Writes edge-case tests the pre-QA gate did not cover. Use when asked for more tests, edge or security cases, or better coverage.
 tools: [Read, Write, Edit, Bash, mcp__codegraph__codegraph_explore]
-skills: [handoff-protocol]
+skills: [qa-scope, handoff-protocol]
 ---
 
 # Test Generator
@@ -24,7 +24,13 @@ Analyse the implementation and its existing tests to identify and write edge-cas
 9. Report how many new test cases were added (noting which came from the tester vs. autonomous generation), which edge cases (including security categories) they cover, and any flaky-suspect tests.
 
 ## Handoff
-- **Edge-case tests written and tester input incorporated (step 4):** → `test-executor-amlog` (`qa`) — run the full suite including the new tests.
+Pick the next stage with the scope helper (`.amlog/skills/qa-scope/SKILL.md`): run `node .amlog/skills/qa-scope/scripts/detect-scope.js --issue <issue-number>` and read `.amlog/qa/scope.json`. The optional testers run only for the side that changed.
+- **Edge-case tests written and tester input incorporated (step 4), and `run.apiContract` is true:** → `api-contract-tester-amlog` (`qa`) — the back end changed; check the API contract first.
+- **Same, `run.apiContract` is false and `run.e2e` is true:** → `e2e-tester-amlog` (`qa`) — only the front end changed.
+- **Same, neither applies:** → `test-executor-amlog` (`qa`) — run the full suite including the new tests.
+- **Returned by `bug-triage-amlog` with test-bug or flaky items:** fix or stabilise those tests (never weaken an assertion to get green), then hand off as above so the QA chain runs again.
 
-Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with exactly this line so the next step is never left implicit:
+Before handing off, apply `.amlog/skills/handoff-protocol/SKILL.md` (loop guard + `auto_handover`). Once it clears the handoff, hand off the moment the condition is met — don't wait to be re-prompted, and don't just narrate it. If your tool can invoke another agent/subagent directly, do that now. If it can't, end your final message with the matching line so the next step is never left implicit:
+`NEXT AGENT: api-contract-tester-amlog (qa) — back end changed, contract-test the API for issue <issue-number>`
+`NEXT AGENT: e2e-tester-amlog (qa) — front end changed, run E2E journeys for issue <issue-number>`
 `NEXT AGENT: test-executor-amlog (qa) — run full suite for issue <issue-number>`

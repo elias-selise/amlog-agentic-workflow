@@ -127,6 +127,30 @@
       "description": "Runs the full test suite and reports a verdict that gates PR merge approval.",
       "path": "agents/qa/test-executor-amlog",
       "triggers": "Run the full test suite and give the QA verdict / coverage report"
+    },
+    {
+      "name": "api-contract-tester-amlog",
+      "type": "qa",
+      "stage": "qa",
+      "description": "Verifies back-end API endpoints honour their contract; optional, runs only when back-end code changed.",
+      "path": "agents/qa/api-contract-tester-amlog",
+      "triggers": "Contract-test or integration-test the API: status codes, schemas, validation, auth, breaking changes vs the base branch"
+    },
+    {
+      "name": "e2e-tester-amlog",
+      "type": "qa",
+      "stage": "qa",
+      "description": "Writes and runs end-to-end browser tests for changed user journeys; optional, runs only when front-end code changed.",
+      "path": "agents/qa/e2e-tester-amlog",
+      "triggers": "Write or run end-to-end / UI regression tests for the changed journeys, with accessibility and console-error checks"
+    },
+    {
+      "name": "bug-triage-amlog",
+      "type": "qa",
+      "stage": "qa",
+      "description": "Turns QA failures into classified, de-duplicated, actionable bugs and routes each to the right agent.",
+      "path": "agents/qa/bug-triage-amlog",
+      "triggers": "Triage a QA failure, file or de-duplicate bugs, or check whether a reported bug is fixed"
     }
   ]
 }

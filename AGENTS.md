@@ -221,7 +221,10 @@ one.
 | `code-quality-amlog` | `dev` | build | ✅ `run-sonarqube.sh` | Triggers SonarQube scan, enforces the quality gate |
 | `review-amlog` | `dev` | build | — | Automated pre-review pass against AC and existing conventions |
 | `test-generator-amlog` | `qa` | qa | — | Writes edge-case tests the pre-QA gate didn't cover |
-| `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` | Runs the full suite, reports pass/fail |
+| `test-executor-amlog` | `qa` | qa | ✅ `run-test-suite.sh` | Runs the full suite, folds in the optional testers' reports, reports the verdict |
+| `api-contract-tester-amlog` | `qa` | qa | ✅ `run-contract-tests.sh` | **Optional** (back end changed). Contract/integration tests per endpoint, OpenAPI breaking-change diff vs `main`, optional fuzzing; uses `api-contract-testing` + `qa-scope` skills |
+| `e2e-tester-amlog` | `qa` | qa | ✅ `run-e2e.sh` | **Optional** (front end changed). Durable Playwright/Cypress journeys from the AC with a11y, console-error and mobile checks; uses `e2e-testing` + `webapp-testing` + `qa-scope` skills |
+| `bug-triage-amlog` | `qa` | qa | ✅ `bug-index.js` | Classifies QA failures, rates severity/priority, localises root cause, de-duplicates via a local ledger, files bugs after human approval, routes each to the right agent; uses `bug-triage` + `qa-scope` skills |
 | `kb-curator-amlog` | `dev` | platform | ✅ `curate-knowledge.sh` | Daily sweep of every repo's `_pending` files into one PR against the shared knowledge base |
 
 This is the same roster discussed in the attached Excalidraw diagram
@@ -416,7 +419,10 @@ amlog-workflow/
 │       │   └── test-runner-amlog/agent.md + scripts/run-affected-tests.sh
 │       └── qa/
 │           ├── test-generator-amlog/agent.md
-│           └── test-executor-amlog/agent.md + scripts/run-test-suite.sh
+│           ├── test-executor-amlog/agent.md + scripts/run-test-suite.sh
+│           ├── api-contract-tester-amlog/agent.md + scripts/run-contract-tests.sh, build-contract-report.js
+│           ├── e2e-tester-amlog/agent.md + scripts/run-e2e.sh, build-e2e-report.js
+│           └── bug-triage-amlog/agent.md + scripts/bug-index.js
 └── README.md
 ```
 
