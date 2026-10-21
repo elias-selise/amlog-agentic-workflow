@@ -218,6 +218,8 @@ package).
   `docs/<issue-number>/agent-trace.json` (next to `instructions.md`/`plan.md`; the
   issue folder is the `docs/<n>/` the session touched most) — paths, line ranges,
   queries/hit counts, captions and metrics, never file contents or tool output.
+  Free text is passed through a credential redactor (`[redacted]`; `redactions`
+  counts them) and the home directory is written as `~`.
   Sessions with no issue folder go to `.amlog/traces/<session>.json`.
 - **Output:** one NDJSON line per file touch appended to
   `.amlog/activity/events.ndjson` (gitignored, size-rotated):

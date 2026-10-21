@@ -3,6 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { ActivityEvent } from '../types';
 import { TranscriptMeta, UsageSample } from './claudeTranscript';
+import { Redactor } from './redact';
 
 // Collects one Claude Code session into the distilled, shareable trace that is
 // written next to the issue's instructions.md / plan.md as
@@ -10,6 +11,7 @@ import { TranscriptMeta, UsageSample } from './claudeTranscript';
 //
 // Distilled on purpose: paths, line ranges, search queries/hit counts, the
 // agent's one-line captions and metrics. Never file contents or tool output.
+// Free text is passed through the redactor first (credentials -> [redacted]).
 
 export const TRACE_FILE = 'agent-trace.json';
 const SCHEMA = 'amlog.agent-trace/v1';
@@ -72,6 +74,7 @@ export class SessionTrace {
   private readonly usage = new Map<string, { agent: string; sample: UsageSample }>();
   private readonly steps: Step[] = [];
   private readonly docsVotes = new Map<string, number>();
+  private readonly redactor = new Redactor();
 
   constructor(readonly sessionId: string) {}
 
@@ -102,8 +105,9 @@ export class SessionTrace {
 
   describeAgent(type: string, id: string, description: string): void {
     const a = this.agentFor(agentKey(type, id), type, id, this.lastTs || new Date().toISOString());
-    if (description && a.description !== description) {
-      a.description = description;
+    const clean = this.redactor.text(description);
+    if (clean && a.description !== clean) {
+      a.description = clean;
       this.dirty = true;
     }
   }
@@ -113,19 +117,19 @@ export class SessionTrace {
     const key = agentKey(ev.agent, ev.agentId);
     const agent = this.agentFor(key, ev.agent, ev.agentId, ev.ts);
     agent.steps++;
-    const step: Step = { t: ev.ts, agent: key, op: ev.op, file: shareablePath(ev.file) };
+    const step: Step = { t: ev.ts, agent: key, op: ev.op, file: this.redactor.text(shareablePath(ev.file)) };
     if (ev.startLine !== undefined) {
       step.lines = [ev.startLine, ev.endLine ?? ev.startLine];
     }
     if (ev.detail) {
-      step.detail = ev.detail;
+      step.detail = this.redactor.text(ev.detail);
     }
     if (ev.query !== undefined) {
-      step.query = ev.query;
+      step.query = this.redactor.text(ev.query);
       step.hits = ev.hitCount ?? 0;
     }
     if (ev.caption) {
-      step.caption = ev.caption;
+      step.caption = this.redactor.text(ev.caption);
     }
     this.steps.push(step);
 
@@ -146,7 +150,7 @@ export class SessionTrace {
 
   addMeta(meta: TranscriptMeta): void {
     if (meta.kind === 'title') {
-      this.title = meta.title;
+      this.title = this.redactor.text(meta.title);
     } else if (meta.kind === 'pr') {
       this.pr = { number: meta.number, url: meta.url, repository: meta.repository };
     } else if (meta.kind === 'cost') {
@@ -196,6 +200,7 @@ export class SessionTrace {
     return {
       title: this.title,
       branch: this.gitBranch,
+      redactions: this.redactor.count,
       startedAt: this.firstTs,
       endedAt: this.lastTs,
       pr: this.pr,

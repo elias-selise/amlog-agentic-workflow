@@ -98,6 +98,17 @@ Paths outside the workspace are written with `~` instead of your home directory.
 It records paths, line ranges, search queries and hit counts, one-line captions
 and metrics. It **never** stores file contents or tool output.
 
+**Credentials are masked.** Free text (captions, shell commands, search queries,
+agent descriptions, the title) goes through `src/transcript/redact.ts` before it is
+written: well-known token formats (GitHub, AWS, Slack, Anthropic/OpenAI, Google,
+npm, GitLab, Stripe, JWTs), private-key blocks, `scheme://user:pass@host`,
+`Authorization`/`Bearer` values, `--password x`-style flags, `curl -u user:pass`
+and `name=value` / `"name": "value"` assignments of names containing
+password/secret/token/api-key/credential become `[redacted]`. `redactions` in each
+session says how many were masked. This is pattern-based: a secret with no
+telltale format or name (a bare random string in prose) can slip through, so skim
+a trace before sharing it outside the team.
+
 > Heads-up: steps appear when a tool call **completes**. While an agent is only
 > thinking, or an edit is waiting for approval, a lane can be quiet even though
 > the agent is busy. Claude Code stores its thinking redacted, so captions come
@@ -140,3 +151,15 @@ finds/tails files, `claudeTranscript.ts` turns records into events,
 of it imports `vscode`, so it runs under plain Node. `src/livePlayer.ts` paces
 live steps per agent for the Code Crawl. `src/replay.ts` + `media/replay.{js,css}` are
 the trace replay (one renderer for the panel and the exported HTML).
+
+### Tests
+
+```bash
+npm test      # compiles, then runs test/*.test.js with Node's built-in runner (Node 22+)
+```
+
+Covers the Bash parser (grep/sed/cat/find/redirects/heredocs/variables and hit
+attribution), the transcript parser, the trace store (merging, privacy,
+redaction), the live player's pacing and the watcher's tailing. The tests use
+synthetic transcript records (`test/helpers.js`) because real transcripts contain
+private code and prompts.
