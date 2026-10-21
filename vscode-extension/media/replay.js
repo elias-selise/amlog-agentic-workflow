@@ -157,7 +157,7 @@
       prev = s;
       const lines = s.lines ? `:${s.lines[0]}${s.lines[1] !== s.lines[0] ? `–${s.lines[1]}` : ''}` : '';
       const what = s.op === 'search'
-        ? `<span class="f mono">${esc(s.query || '')}</span> <span class="d">→ ${s.hits || 0} hit(s) in ${esc(s.file)}</span>`
+        ? `<span class="f mono">${esc(s.query || '')}</span> <span class="d">${s.hits === undefined ? `in ${esc(s.file)}` : `→ ${s.hits} hit(s) in ${esc(s.file)}`}</span>`
         : s.op === 'bash'
           ? `<span class="d">${esc(s.detail || 'command')}</span>`
           : `<span class="f mono">${esc(s.file)}${esc(lines)}</span> <span class="d">${esc(s.detail || '')}</span>`;
@@ -215,7 +215,7 @@
     const lines = s.lines ? ` · lines ${s.lines[0]}${s.lines[1] !== s.lines[0] ? `–${s.lines[1]}` : ''}` : '';
     el.innerHTML = `<div class="now-top"><span class="agent-tag"><i style="background:${colorFor(s.agent)}"></i>${esc(agent ? agent.type : s.agent)}</span>`
       + `<span class="op-tag ${esc(s.op)}">${esc(OP_LABEL[s.op] || s.op)}</span><span class="when">${esc(clock(s.t))}</span></div>`
-      + (s.op === 'search' ? `<div class="now-file mono">⌕ ${esc(s.query || '')}</div><div class="now-detail">${s.hits || 0} hit(s) in ${esc(s.file)}</div>`
+      + (s.op === 'search' ? `<div class="now-file mono">⌕ ${esc(s.query || '')}</div><div class="now-detail">${s.hits === undefined ? 'results not recorded' : `${s.hits} hit(s)`} in ${esc(s.file)}</div>`
         : s.op === 'bash' ? `<div class="now-file mono">${esc(s.detail || '')}</div>`
           : `<div class="now-file mono">${esc(s.file)}${esc(lines)}</div><div class="now-detail">${esc(s.detail || '')}</div>`)
       + (s.caption ? `<div class="quote">“${esc(s.caption)}”</div>` : '');

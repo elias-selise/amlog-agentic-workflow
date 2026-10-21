@@ -94,15 +94,17 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
-  // Primary source: the Claude Code session transcripts (full detail: Bash
-  // reads/searches, exact line ranges, captions, tokens). The hook file stays
-  // as the fallback for sessions whose transcript can't be found.
+  // Primary source: the agents' own session logs (Claude Code transcripts,
+  // Codex rollouts, Antigravity conversations): full detail with Bash
+  // reads/searches, exact line ranges, captions and tokens. The Claude hook file
+  // stays as the fallback for sessions whose transcript can't be found.
   const useTranscripts = config().get<string>('captureSource', 'transcript') === 'transcript';
   const watcher = useTranscripts
     ? new SessionWatcher({
       root: root.fsPath,
       lookbackMs: Math.max(0, config().get<number>('sessionLookbackMinutes', 60)) * 60_000,
       pollMs: TRANSCRIPT_POLL_MS,
+      sources: config().get<string[]>('agentSources', ['claude', 'codex', 'antigravity']),
       writeTraces: config().get<boolean>('writeTraceFile', true),
       traceFallbackDir: path.join(amlogDir.fsPath, 'traces'),
       onEvent,
@@ -168,7 +170,7 @@ export function activate(context: vscode.ExtensionContext): void {
         state.setTrailLength(config().get<number>('trailLength', 8));
       }
       if (e.affectsConfiguration('amlog.captureSource') || e.affectsConfiguration('amlog.writeTraceFile')
-        || e.affectsConfiguration('amlog.sessionLookbackMinutes')) {
+        || e.affectsConfiguration('amlog.sessionLookbackMinutes') || e.affectsConfiguration('amlog.agentSources')) {
         vscode.window.showInformationMessage('AMLOG: reload the window to apply the new capture settings.');
       }
     }),

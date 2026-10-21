@@ -1,7 +1,7 @@
 # AMLOG Spider Crawler (VS Code extension)
 
 See what your [AMLOG](../AGENTS.md) agents are actually doing. As agents work in
-Claude Code, a **line-drawn spider** follows every read, edit and search: live in
+Claude Code, Codex or Antigravity, a **line-drawn spider** follows every read, edit and search: live in
 the **Code Crawl**, as a bird's-eye **Crawl Map** with a full recap, and as a
 shareable **`docs/<issue>/agent-trace.json`** that travels with the PR.
 
@@ -34,6 +34,31 @@ shareable **`docs/<issue>/agent-trace.json`** that travels with the PR.
    folder go to `.amlog/traces/<session>.json` (gitignored).
 
 Scratch files (temp dirs, `~/.claude`) are left out of the views and the trace.
+
+## Supported agents
+
+| Agent | Where its log is read from | What you get |
+| --- | --- | --- |
+| **Claude Code** | `~/.claude/projects/<workspace>/<session>.jsonl` + `subagents/` | Everything below, including subagents. |
+| **Codex CLI** | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` | Shell reads/searches (`exec_command` and the `exec` tool, parsed like Bash), **exact edit lines** from `apply_patch` diffs, captions, tokens. |
+| **Antigravity CLI** | `~/.gemini/antigravity-cli/brain/<conversation>/.system_generated/logs/transcript_full.jsonl` | Reads (`view_file` with line ranges), edits (`replace_file_content`, `write_to_file`…), shell, `grep_search`/`find_by_name`/`list_dir`, captions from each call's summary, tokens. |
+
+Only sessions that worked in **this workspace or another git worktree of the same
+repository** are read; others are never opened beyond their first few records.
+Every agent shows as its own lane / agent colour, and each session in the trace
+file says which agent wrote it (`source`). Pick the agents with
+`amlog.agentSources` (default: all three).
+
+Limits per agent, from what each log contains:
+- **Codex**: a `Plan` and reasoning are not shown; edits without a diff in the log
+  (rare) show no line range.
+- **Antigravity**: tool results carry no call id and parallel calls finish in any
+  order, so exit codes and `find`/shell search hits are attached only when a turn
+  made a single call. `grep_search` hits are not itemised in the log (the search
+  is shown without a hit list). Conversations are matched to the workspace by the
+  first files they touch, as the log has no working directory.
+- The Claude-only hook fallback and the `transcript_path` handshake do not apply
+  to the other two.
 
 ## What you get
 

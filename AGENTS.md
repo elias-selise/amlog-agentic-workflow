@@ -206,6 +206,12 @@ package).
 - **Registration:** `src/lib/hooks.js` merges a `PostToolUse` entry (matcher
   `Read|Write|Edit|MultiEdit|NotebookEdit|Grep|Glob|Bash`) into `.claude/settings.json`,
   preserving any existing settings/hooks. Idempotent; `amlog uninstall` removes it.
+- **Other agents (extension ≥ 0.4.0):** the extension also follows Codex CLI
+  (`~/.codex/sessions/…/rollout-*.jsonl`) and Antigravity CLI
+  (`~/.gemini/antigravity-cli/brain/<id>/.system_generated/logs/transcript_full.jsonl`)
+  sessions that worked in the workspace (or another worktree of its repo), into the
+  same events and the same `agent-trace.json` (`source` says which agent). No hook
+  is involved. Choose agents with the `amlog.agentSources` setting.
 - **Transcript is the primary source (extension ≥ 0.2.0):** each hook event also
   carries `transcript` (the hook's `transcript_path`). The extension tails the
   Claude Code session transcript (`~/.claude/projects/<encoded path>/<session>.jsonl`

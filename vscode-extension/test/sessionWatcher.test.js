@@ -5,10 +5,16 @@ const os = require('node:os');
 const path = require('node:path');
 const { assistant, text, toolUse, result } = require('./helpers.js');
 
-// Point Claude's config dir at a temp folder before the watcher resolves it.
-const base = fs.mkdtempSync(path.join(os.tmpdir(), 'amlog-watch-'));
+// Point every agent's home at a temp folder before the watcher resolves it, so
+// the tests never read the real ~/.claude, ~/.codex or ~/.gemini. The folder is
+// under the home directory, not /tmp: Antigravity's source ignores /tmp paths.
+const base = fs.mkdtempSync(path.join(os.homedir(), 'amlog-watch-test-'));
+test.after(() => fs.rmSync(base, { recursive: true, force: true }));
 process.env.CLAUDE_CONFIG_DIR = path.join(base, 'claude');
-const { SessionWatcher, projectDirFor } = require('../out/transcript/sessionWatcher.js');
+process.env.CODEX_HOME = path.join(base, 'codex');
+process.env.AMLOG_ANTIGRAVITY_HOME = path.join(base, 'agy');
+const { SessionWatcher } = require('../out/transcript/sessionWatcher.js');
+const { projectDirFor } = require('../out/transcript/claudeSource.js');
 
 const append = (file, recs) => fs.appendFileSync(file, recs.map((r) => JSON.stringify(r)).join('\n') + '\n');
 async function until(cond, ms = 4000) {
@@ -145,5 +151,77 @@ test('old sessions outside the lookback window are not replayed', async () => {
     assert.equal(w.isTracked('ancient'), false);
   } finally {
     w.dispose();
+  }
+});
+
+const pad = (n) => String(n).padStart(2, '0');
+function codexRollout(id, cwd, records) {
+  const d = new Date();
+  const f = path.join(process.env.CODEX_HOME, 'sessions', String(d.getFullYear()), pad(d.getMonth() + 1), pad(d.getDate()), `rollout-x-${id}.jsonl`);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, [{ timestamp: new Date().toISOString(), type: 'session_meta', payload: { id, cwd, git: { branch: 'feat/cx' } } }, ...records].map((r) => JSON.stringify(r)).join('\n') + '\n');
+  return f;
+}
+const cxCall = (id, cmd, cwd) => ({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'function_call', name: 'exec_command', call_id: id, arguments: JSON.stringify({ cmd, workdir: cwd }) } });
+const cxOut = (id, body) => ({ timestamp: new Date().toISOString(), type: 'response_item', payload: { type: 'function_call_output', call_id: id, output: `Process exited with code 0\nOutput:\n${body}` } });
+function agyConversation(id, records) {
+  const f = path.join(process.env.AMLOG_ANTIGRAVITY_HOME, 'brain', id, '.system_generated', 'logs', 'transcript_full.jsonl');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  fs.writeFileSync(f, records.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  return f;
+}
+const agyStep = (i, calls) => ({ step_index: i, type: 'PLANNER_RESPONSE', created_at: new Date().toISOString(), input_tokens: 10, output_tokens: 2, tool_calls: calls });
+
+test('follows Codex and Antigravity sessions alongside Claude\'s, each labelled and traced', async () => {
+  const ws = path.join(base, 'multi');
+  fs.mkdirSync(path.join(ws, 'docs', '7'), { recursive: true });
+  fs.writeFileSync(path.join(ws, 'docs', '7', 'plan.md'), '# plan\n');
+  fs.writeFileSync(path.join(ws, 'a.ts'), 'x\n');
+  const cx = codexRollout('cx-1', ws, []);
+  const agy = agyConversation('agy-1', [agyStep(0, [{ name: 'run_command', args: { CommandLine: 'ls', Cwd: ws } }])]);
+  const got = [];
+  const w = new SessionWatcher({
+    root: ws, lookbackMs: 3600e3, pollMs: 40, writeTraces: true, traceFallbackDir: path.join(ws, '.amlog', 'traces'),
+    onEvent: (e, live) => got.push({ ...e, live }),
+  });
+  try {
+    await new Promise((r) => setTimeout(r, 150));
+    assert.ok(w.isTracked('cx-1'));
+    append(cx, [cxCall('c1', "sed -n '1,5p' docs/7/plan.md", ws), cxOut('c1', 'text')]);
+    append(agy, [agyStep(1, [{ name: 'view_file', args: { AbsolutePath: path.join(ws, 'a.ts'), StartLine: 1, EndLine: 3, toolSummary: 'Read a.ts' } }, { name: 'list_dir', args: { DirectoryPath: ws } }])]);
+    await until(() => got.some((e) => e.agent === 'codex') && got.some((e) => e.agent === 'antigravity' && e.op === 'read'));
+    const codex = got.find((e) => e.agent === 'codex');
+    const read = got.find((e) => e.agent === 'antigravity' && e.op === 'read');
+    assert.deepEqual([codex.op, codex.file, codex.startLine, codex.endLine, codex.live], ['read', 'docs/7/plan.md', 1, 5, true]);
+    assert.deepEqual([read.file, read.startLine, read.endLine, read.caption, read.live], ['a.ts', 1, 3, 'Read a.ts', true]);
+  } finally {
+    w.dispose();
+  }
+  const doc = JSON.parse(fs.readFileSync(path.join(ws, 'docs', '7', 'agent-trace.json'), 'utf8'));
+  assert.equal(doc.sessions['cx-1'].source, 'codex');
+  assert.equal(doc.sessions['cx-1'].branch, 'feat/cx');
+  assert.equal(doc.sessions['cx-1'].agents[0].key, 'codex');
+});
+
+test('amlog.agentSources limits which agents are read', async () => {
+  const ws = path.join(base, 'only-claude');
+  fs.mkdirSync(ws, { recursive: true });
+  codexRollout('cx-2', ws, [cxCall('c1', 'cat a.ts', ws), cxOut('c1', 'x')]);
+  const got = [];
+  const w = new SessionWatcher({ root: ws, lookbackMs: 3600e3, pollMs: 40, writeTraces: false, sources: ['claude'], onEvent: (e) => got.push(e) });
+  try {
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(got.length, 0);
+    assert.equal(w.isTracked('cx-2'), false);
+  } finally {
+    w.dispose();
+  }
+  const got2 = [];
+  const w2 = new SessionWatcher({ root: ws, lookbackMs: 3600e3, pollMs: 40, writeTraces: false, sources: ['codex'], onEvent: (e) => got2.push(e) });
+  try {
+    await until(() => got2.length > 0);
+    assert.equal(got2[0].agent, 'codex');
+  } finally {
+    w2.dispose();
   }
 });

@@ -377,10 +377,13 @@
       const hits = step.hits || [];
       const total = step.hitCount || 0;
       const files = new Set(hits.map((h) => h.file)).size;
-      this.searchMeta.textContent = total
-        ? `${total} hit(s) in ${files}${total > hits.length ? '+' : ''} file(s) · in ${shortPath(step.file)}`
-        : `no hits · in ${shortPath(step.file)}`;
-      this.searchMeta.classList.toggle('none', !total);
+      const known = step.hitCount !== undefined && step.hitCount !== null;
+      this.searchMeta.textContent = !known
+        ? `results not recorded by this agent · in ${shortPath(step.file)}`
+        : total
+          ? `${total} hit(s) in ${files}${total > hits.length ? '+' : ''} file(s) · in ${shortPath(step.file)}`
+          : `no hits · in ${shortPath(step.file)}`;
+      this.searchMeta.classList.toggle('none', known && !total);
       const rows = hits.slice(0, MAX_HIT_ROWS);
       this.hitsEl.innerHTML = rows.map((h, i) =>
         `<div class="hit" data-i="${i}"><span class="hit-file">${escapeHtml(shortPath(h.file))}</span>`
